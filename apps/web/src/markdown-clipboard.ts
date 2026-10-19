@@ -343,6 +343,9 @@ export function serializeTableElementToCsv(table: Element): string {
 }
 
 function sanitizedHtmlFrom(container: Element): string {
+  for (const node of container.querySelectorAll("[data-markdown-copy-text]")) {
+    node.textContent = node.getAttribute("data-markdown-copy-text");
+  }
   for (const node of container.querySelectorAll(SANITIZED_HTML_SELECTOR)) {
     if (
       node.classList.contains("chat-markdown-file-link") ||
@@ -367,10 +370,19 @@ export function chatMarkdownClipboardPayload(
     const range = selection.getRangeAt(index);
     if (range.collapsed) continue;
     const container = document.createElement("div");
-    container.appendChild(range.cloneContents());
     const ancestor = range.commonAncestorContainer;
     const ancestorElement =
       ancestor.nodeType === Node.ELEMENT_NODE ? (ancestor as Element) : ancestor.parentElement;
+    const copySource = ancestorElement?.closest("[data-markdown-copy][data-markdown-copy-text]");
+    const fragment = range.cloneContents();
+    // A range inside a citation's number label omits its copy metadata wrapper.
+    if (copySource) {
+      const wrapper = copySource.cloneNode(false);
+      wrapper.appendChild(fragment);
+      container.appendChild(wrapper);
+    } else {
+      container.appendChild(fragment);
+    }
     if (ancestorElement?.closest("pre")) {
       const text = range.toString();
       if (text) {
