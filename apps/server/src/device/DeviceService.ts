@@ -103,11 +103,18 @@ export class DeviceService extends Context.Service<
     readonly testHost: (
       config: SshDeviceHostConfig,
     ) => Effect.Effect<DeviceHostSummary, DeviceError>;
+    /**
+     * The agent-device flags that reach the device: its config and session,
+     * and the id agent-device selects it by, which can differ from its id here.
+     */
     readonly agentTarget: (input: {
       threadId: ThreadId;
       hostId: DeviceHostId;
       deviceId: DeviceId;
-    }) => Effect.Effect<ReadonlyArray<string>, DeviceError>;
+    }) => Effect.Effect<
+      { readonly agentDeviceId: string; readonly args: ReadonlyArray<string> },
+      DeviceError
+    >;
     readonly state: Effect.Effect<DeviceServiceState>;
     readonly subscribe: Effect.Effect<PubSub.Subscription<DeviceServiceState>, never, Scope.Scope>;
     readonly configure: (
@@ -381,13 +388,16 @@ export const makeWithHosts = Effect.fn("DeviceService.makeWithHosts")(function* 
             ...state.devices.filter((device) => device.hostId !== ready.hostId),
             ...devices,
           ],
-          // A host can end a device itself (EAS stops sessions at their limits),
-          // and a session on a device it no longer lists has nothing to stream.
-          sessions: state.sessions.filter(
-            (session) =>
-              session.hostId !== ready.hostId ||
-              devices.some((device) => device.id === session.deviceId),
-          ),
+          // A host that ends devices itself (EAS stops sessions at their limits)
+          // leaves sessions on devices it no longer lists with nothing to stream.
+          // Other hosts can miss a device for one listing, so theirs stay.
+          sessions: ready.devices.endsDevices
+            ? state.sessions.filter(
+                (session) =>
+                  session.hostId !== ready.hostId ||
+                  devices.some((device) => device.id === session.deviceId),
+              )
+            : state.sessions,
           hostStatuses: {
             ...state.hostStatuses,
             [ready.hostId]: { status: "ready", ...(detail ? { detail } : {}) },
@@ -797,7 +807,7 @@ export const makeWithHosts = Effect.fn("DeviceService.makeWithHosts")(function* 
               reason:
                 "Agent device access requires enabled device support, agent access, and an available simulator platform on this host.",
             });
-          const configPath = yield* lifecycleLock.withPermit(
+          const { configPath, agentDeviceId } = yield* lifecycleLock.withPermit(
             Effect.gen(function* () {
               if (hosts.get(host.id) !== host)
                 return yield* new DeviceHostUnavailableError({
@@ -807,7 +817,10 @@ export const makeWithHosts = Effect.fn("DeviceService.makeWithHosts")(function* 
                 });
               if (ready.devices.agentEndpoint) {
                 const endpoint = yield* ready.devices.agentEndpoint(input.deviceId);
-                return yield* configureAgent(input.hostId, endpoint, input.deviceId);
+                return {
+                  configPath: yield* configureAgent(input.hostId, endpoint, input.deviceId),
+                  agentDeviceId: endpoint.agentDeviceId,
+                };
               }
               if (!ready.agentDevice)
                 return yield* new DeviceHostUnavailableError({
@@ -815,7 +828,10 @@ export const makeWithHosts = Effect.fn("DeviceService.makeWithHosts")(function* 
                   hostLabel: host.label,
                   reason: "This host has no agent-device daemon.",
                 });
-              return yield* configureAgent(input.hostId, ready.agentDevice);
+              return {
+                configPath: yield* configureAgent(input.hostId, ready.agentDevice),
+                agentDeviceId: input.deviceId,
+              };
             }),
           );
           const session = yield* agentDeviceSession(
@@ -823,7 +839,7 @@ export const makeWithHosts = Effect.fn("DeviceService.makeWithHosts")(function* 
             input.hostId,
             input.deviceId,
           ).pipe(Effect.provideService(Crypto.Crypto, crypto));
-          return ["--config", configPath, "--session", session];
+          return { agentDeviceId, args: ["--config", configPath, "--session", session] };
         }),
       state: SynchronizedRef.get(stateRef).pipe(Effect.map(({ state }) => state)),
       subscribe: PubSub.subscribe(statePubSub),
