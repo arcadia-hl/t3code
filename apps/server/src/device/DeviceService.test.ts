@@ -176,6 +176,7 @@ const fixture = Effect.fn("fixture")(function* (
         }
       : {}),
     id: LOCAL_DEVICE_HOST_ID,
+    label: "This machine",
     summary: Effect.succeed({
       id: LOCAL_DEVICE_HOST_ID,
       kind: "local",
@@ -648,6 +649,7 @@ it.effect.each(["shutdown", "close"] as const)(
       };
       const host: DeviceHost.DeviceHost["Service"] = {
         id: LOCAL_DEVICE_HOST_ID,
+        label: "This machine",
         summary: Effect.succeed({
           id: LOCAL_DEVICE_HOST_ID,
           kind: "local",
@@ -746,6 +748,7 @@ it.effect.each([
       };
       const host: DeviceHost.DeviceHost["Service"] = {
         id: LOCAL_DEVICE_HOST_ID,
+        label: "This machine",
         summary: Effect.succeed({
           id: LOCAL_DEVICE_HOST_ID,
           kind: "local",
@@ -1012,6 +1015,7 @@ it.effect("reconciles SSH host settings without publishing no-op changes", () =>
     const removedFiles: string[] = [];
     const localHost: DeviceHost.DeviceHost["Service"] = {
       id: LOCAL_DEVICE_HOST_ID,
+      label: "This machine",
       summary: Effect.succeed({
         id: LOCAL_DEVICE_HOST_ID,
         label: "Local",
@@ -1115,6 +1119,7 @@ it.effect("a failed tool update reports npm's exit code but not its output", () 
   Effect.gen(function* () {
     const host: DeviceHost.DeviceHost["Service"] = {
       id: LOCAL_DEVICE_HOST_ID,
+      label: "This machine",
       summary: Effect.succeed({
         id: LOCAL_DEVICE_HOST_ID,
         kind: "local",

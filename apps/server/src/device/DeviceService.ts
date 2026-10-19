@@ -22,6 +22,7 @@ import {
   type SshDeviceHostConfig,
   type DeviceHostSummary,
   LOCAL_DEVICE_HOST_ID,
+  LOCAL_DEVICE_HOST_LABEL,
   type ThreadId,
 } from "@t3tools/contracts";
 import { SshCommandError } from "@t3tools/ssh/errors";
@@ -150,6 +151,7 @@ export const makeWithHosts = Effect.fn("DeviceService.makeWithHosts")(function* 
     Effect.fail(
       new DeviceHostUnavailableError({
         hostId: host.id,
+        hostLabel: host.label,
         reason: "SSH probing is unavailable in this device service.",
       }),
     ),
@@ -240,6 +242,7 @@ export const makeWithHosts = Effect.fn("DeviceService.makeWithHosts")(function* 
       if (!(yield* readDeviceSettings).enabled) {
         return yield* new DeviceHostUnavailableError({
           hostId: host.id,
+          hostLabel: host.label,
           reason:
             "Device support is off. Enable it in the Device panel before installing or starting device tools.",
         });
@@ -262,6 +265,7 @@ export const makeWithHosts = Effect.fn("DeviceService.makeWithHosts")(function* 
             (error) =>
               new DeviceHostUnavailableError({
                 hostId: host.id,
+                hostLabel: host.label,
                 reason:
                   error._tag === "NodeRuntimeUnavailableError"
                     ? nodeRuntimeUnavailableMessage("Local device support")
@@ -275,6 +279,7 @@ export const makeWithHosts = Effect.fn("DeviceService.makeWithHosts")(function* 
       if (hosts.get(host.id) !== host)
         return yield* new DeviceHostUnavailableError({
           hostId: host.id,
+          hostLabel: host.label,
           reason: "Host configuration changed. Retry the operation.",
         });
       const { state } = yield* SynchronizedRef.get(stateRef);
@@ -323,6 +328,7 @@ export const makeWithHosts = Effect.fn("DeviceService.makeWithHosts")(function* 
             (error) =>
               new DeviceHostUnavailableError({
                 hostId: host.id,
+                hostLabel: host.label,
                 reason:
                   error._tag === "NodeRuntimeUnavailableError"
                     ? nodeRuntimeUnavailableMessage("Local device support")
@@ -606,6 +612,7 @@ export const makeWithHosts = Effect.fn("DeviceService.makeWithHosts")(function* 
       if (hosts.get(host.id) !== host)
         return yield* new DeviceHostUnavailableError({
           hostId: host.id,
+          hostLabel: host.label,
           reason: "Host configuration changed. Retry the operation.",
         });
       const openedAt = DateTime.formatIso(yield* DateTime.now);
@@ -621,6 +628,7 @@ export const makeWithHosts = Effect.fn("DeviceService.makeWithHosts")(function* 
           if (!(yield* readDeviceSettings).enabled)
             return yield* new DeviceHostUnavailableError({
               hostId: host.id,
+              hostLabel: host.label,
               reason: "Device support was turned off while the device was opening.",
             });
           yield* publish((current) => ({
@@ -784,7 +792,8 @@ export const makeWithHosts = Effect.fn("DeviceService.makeWithHosts")(function* 
           const ready = yield* agentReadinessIfSupported(input.hostId);
           if (!ready)
             return yield* new DeviceHostUnavailableError({
-              hostId: input.hostId,
+              hostId: host.id,
+              hostLabel: host.label,
               reason:
                 "Agent device access requires enabled device support, agent access, and an available simulator platform on this host.",
             });
@@ -793,6 +802,7 @@ export const makeWithHosts = Effect.fn("DeviceService.makeWithHosts")(function* 
               if (hosts.get(host.id) !== host)
                 return yield* new DeviceHostUnavailableError({
                   hostId: host.id,
+                  hostLabel: host.label,
                   reason: "Host configuration changed. Retry the operation.",
                 });
               if (ready.devices.agentEndpoint) {
@@ -802,6 +812,7 @@ export const makeWithHosts = Effect.fn("DeviceService.makeWithHosts")(function* 
               if (!ready.agentDevice)
                 return yield* new DeviceHostUnavailableError({
                   hostId: host.id,
+                  hostLabel: host.label,
                   reason: "This host has no agent-device daemon.",
                 });
               return yield* configureAgent(input.hostId, ready.agentDevice);
@@ -1048,6 +1059,7 @@ export const make = Effect.gen(function* () {
         error._tag === "NodeRuntimeUnavailableError"
           ? new DeviceHostUnavailableError({
               hostId: LOCAL_DEVICE_HOST_ID,
+              hostLabel: LOCAL_DEVICE_HOST_LABEL,
               reason: nodeRuntimeUnavailableMessage("Device automation"),
               cause: error,
             })
