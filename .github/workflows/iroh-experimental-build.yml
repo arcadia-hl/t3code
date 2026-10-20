@@ -17,13 +17,19 @@ jobs:
       CSC_IDENTITY_AUTO_DISCOVERY: 'false'
       NODE_OPTIONS: --max-old-space-size=4096
     steps:
-      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
-        with:
-          persist-credentials: false
-          sparse-checkout: |
-            /*
-            !/.repos/
-          sparse-checkout-cone-mode: false
+      - name: Fetch exact public build source without credentials
+        shell: pwsh
+        run: |
+          git init .
+          git config core.autocrlf false
+          git remote add origin https://github.com/arcadia-hl/t3code.git
+          git fetch --no-tags --depth=1 origin $env:GITHUB_SHA
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          @('/*', '!/.repos/') | git sparse-checkout set --no-cone --stdin
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          git -c submodule.recurse=false checkout --detach FETCH_HEAD
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          if ((git rev-parse HEAD) -ne $env:GITHUB_SHA) { throw 'Build source SHA mismatch' }
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 24.13.1
