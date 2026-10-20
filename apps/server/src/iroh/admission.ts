@@ -3,6 +3,7 @@
 export class TransportAdmission<C extends { close(code: bigint, reason: number[]): void }> {
   readonly connections = new Map<C, string | undefined>();
   private readonly revoked = new Set<string>();
+  private readonly authorizationTimers = new Map<C, ReturnType<typeof setTimeout>>();
   private handshakes = 0;
   private controls = 0;
   private readonly connectionLimit: number;
@@ -41,6 +42,13 @@ export class TransportAdmission<C extends { close(code: bigint, reason: number[]
       return false;
     }
     this.connections.set(connection, undefined);
+    const timer = setTimeout(() => {
+      // Established peers must authorize promptly, even if they never open a stream.
+      this.remove(connection);
+      connection.close(1n, []);
+    }, 15_000);
+    timer.unref?.();
+    this.authorizationTimers.set(connection, timer);
     return true;
   }
   authorize(connection: C, deviceId: string): boolean {
@@ -49,19 +57,26 @@ export class TransportAdmission<C extends { close(code: bigint, reason: number[]
       return false;
     }
     this.connections.set(connection, deviceId);
+    this.clearAuthorizationTimer(connection);
     return true;
   }
   device(connection: C): string | undefined {
     return this.connections.get(connection);
   }
   remove(connection: C): void {
+    this.clearAuthorizationTimer(connection);
     this.connections.delete(connection);
+  }
+  private clearAuthorizationTimer(connection: C): void {
+    const timer = this.authorizationTimers.get(connection);
+    if (timer !== undefined) clearTimeout(timer);
+    this.authorizationTimers.delete(connection);
   }
   revoke(deviceId: string): void {
     this.revoked.add(deviceId);
     for (const [connection, id] of this.connections)
       if (id === deviceId) {
-        this.connections.delete(connection);
+        this.remove(connection);
         connection.close(1n, []);
       }
   }

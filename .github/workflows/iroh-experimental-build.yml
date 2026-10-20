@@ -1,5 +1,7 @@
 name: Iroh experimental Windows x64 artifact
 on:
+  push:
+    branches: [build/iroh-x64-preview]
   workflow_dispatch:
 permissions:
   contents: read
@@ -15,10 +17,10 @@ jobs:
       CSC_IDENTITY_AUTO_DISCOVERY: 'false'
       NODE_OPTIONS: --max-old-space-size=4096
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           persist-credentials: false
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 24.13.1
       - name: Install project dependencies
@@ -30,6 +32,15 @@ jobs:
         run: '"${{ github.workspace }}/node_modules/.bin" >> $env:GITHUB_PATH'
       - name: Install Electron
         run: vp run --filter '@t3tools/desktop' ensure:electron
+      - name: Install Windows native helper prerequisites
+        shell: pwsh
+        run: |
+          $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+          $installPath = & $vswhere -products * -latest -property installationPath
+          if (-not $installPath) { throw 'Visual Studio installation not found' }
+          $setupExe = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\setup.exe"
+          $proc = Start-Process -FilePath $setupExe -ArgumentList 'modify', '--installPath', "`"$installPath`"", '--add', 'Microsoft.VisualStudio.Component.VC.Runtimes.x86.x64.Spectre', '--quiet', '--norestart' -Wait -PassThru -NoNewWindow
+          if ($null -eq $proc -or $proc.ExitCode -notin @(0, 3010)) { throw 'Spectre library installation failed' }
       - name: Build reviewed native source
         shell: pwsh
         run: |
@@ -71,7 +82,7 @@ jobs:
           exit $LASTEXITCODE
       - name: Artifact manifest
         run: node scripts/iroh-artifact-manifest.mjs artifacts/windows-x64
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: t3-code-iroh-windows-x64-${{ github.sha }}
           path: artifacts/windows-x64/
