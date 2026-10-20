@@ -1,12 +1,16 @@
-// @effect-diagnostics nodeBuiltinImport:off -- Windowless Windows packaging acceptance probe owns and removes its private temporary fixtures.
+// @effect-diagnostics nodeBuiltinImport:off -- Windowless packaging probe uses supervisor-owned private fixtures, removed after Electron exits.
 import * as Electron from "electron";
 import * as NodeFS from "node:fs";
-import * as NodeOS from "node:os";
 import * as NodePath from "node:path";
 import * as NodeCrypto from "node:crypto";
 import * as NodeAssert from "node:assert/strict";
 import { encryptedProfileStore } from "./encryptedProfiles.ts";
-const root = NodeFS.mkdtempSync(NodePath.join(NodeOS.tmpdir(), "t3-iroh-dpapi-"));
+const rootArgument = process.argv.indexOf("--iroh-probe-root");
+const suppliedRoot = process.argv[rootArgument + 1];
+if (rootArgument < 0 || suppliedRoot === undefined || !NodePath.isAbsolute(suppliedRoot)) {
+  throw new Error("Storage probe requires its supervisor-owned fixture directory.");
+}
+const root = suppliedRoot;
 NodeFS.mkdirSync(NodePath.join(root, "electron"));
 Electron.app.setPath("userData", NodePath.join(root, "electron"));
 async function probe() {
@@ -49,14 +53,7 @@ async function probe() {
   NodeAssert.equal((await store.list()).length, 0);
   process.stdout.write("Windows safeStorage profile probe passed.\n");
 }
-const run = async () => {
-  try {
-    await probe();
-  } finally {
-    NodeFS.rmSync(root, { recursive: true, force: true });
-  }
-};
-void run().then(
+void probe().then(
   () => Electron.app.exit(0),
   () => {
     process.stderr.write("Windows safeStorage profile probe failed.\n");

@@ -11,11 +11,11 @@ jobs:
     timeout-minutes: 90
     env:
       CARGO_BUILD_JOBS: 1
-      CARGO_PROFILE_RELEASE_LTO: 'off'
+      CARGO_PROFILE_RELEASE_LTO: "off"
       RUSTUP_TOOLCHAIN: 1.99.1
       RAYON_NUM_THREADS: 1
-      T3CODE_DESKTOP_DEV: '0'
-      CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+      T3CODE_DESKTOP_DEV: "0"
+      CSC_IDENTITY_AUTO_DISCOVERY: "false"
       NODE_OPTIONS: --max-old-space-size=4096
     steps:
       - name: Fetch exact public build source without credentials
@@ -61,7 +61,7 @@ jobs:
           node packages/iroh/build.mjs
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
       - name: Native Node regressions and protected-store boundaries
-        run: node --import ./scripts/iroh-upstream-tests.mjs --test .generated/iroh-ffi/iroh-js/test/key.mjs .generated/iroh-ffi/iroh-js/test/relay.mjs .generated/iroh-ffi/iroh-js/test/endpoint.mjs packages/iroh/src/nativeCancellation.test.ts packages/iroh/src/nativeOverride.test.ts packages/iroh/src/target.test.ts scripts/lib/iroh-runtime.test.ts apps/server/src/iroh/cli.test.ts apps/desktop/src/iroh/encryptedProfiles.test.ts apps/desktop/src/iroh/gatewayOwners.test.ts
+        run: node --import ./scripts/iroh-upstream-tests.mjs --test .generated/iroh-ffi/iroh-js/test/key.mjs .generated/iroh-ffi/iroh-js/test/relay.mjs .generated/iroh-ffi/iroh-js/test/endpoint.mjs packages/iroh/src/nativeCancellation.test.ts packages/iroh/src/nativeOverride.test.ts packages/iroh/src/target.test.ts scripts/lib/iroh-runtime.test.ts scripts/iroh-windows-storage-probe.test.mjs apps/server/src/iroh/cli.test.ts apps/desktop/src/iroh/encryptedProfiles.test.ts apps/desktop/src/iroh/gatewayOwners.test.ts
       - name: Native Electron regressions
         shell: pwsh
         run: |
@@ -77,10 +77,7 @@ jobs:
           node scripts/build-desktop-artifact.ts --platform win --target nsis --arch x64 --build-version 0.1.0-preview.20261020.2 --output-dir artifacts/windows-x64 --keep-stage --verbose
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
       - name: Actual Windows protected storage without a browser window
-        shell: pwsh
-        run: |
-          & apps/desktop/node_modules/electron/dist/electron.exe apps/desktop/dist-electron/safeStorageProbe.cjs
-          exit $LASTEXITCODE
+        run: node scripts/iroh-windows-storage-probe.mjs
       - name: Packaged ASAR native resolution
         shell: pwsh
         run: |
