@@ -20,6 +20,11 @@ export function getDesktopScheme(isDevelopment: boolean): string {
   return isDevelopment ? DESKTOP_DEVELOPMENT_SCHEME : DESKTOP_PRODUCTION_SCHEME;
 }
 
+// OS associations use the fork namespace; renderer auth and IPC keep their existing origin.
+export function getDesktopUrlHandlerScheme(isDevelopment: boolean): string {
+  return isDevelopment ? "t3code-iroh-dev" : "t3code-iroh";
+}
+
 function getDesktopOrigin(isDevelopment: boolean): string {
   return `${getDesktopScheme(isDevelopment)}://${DESKTOP_HOST}`;
 }

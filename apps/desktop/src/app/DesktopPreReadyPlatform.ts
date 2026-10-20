@@ -110,7 +110,7 @@ export const make = Effect.gen(function* () {
               appVersion: Electron.app.getVersion(),
             }).displayName,
             execTarget: process.env.APPIMAGE?.trim() || process.execPath,
-            scheme: ElectronProtocol.getDesktopScheme(linux.isDevelopment),
+            scheme: ElectronProtocol.getDesktopUrlHandlerScheme(linux.isDevelopment),
             ...(iconPath === undefined ? {} : { iconPath }),
           }),
           "utf8",
