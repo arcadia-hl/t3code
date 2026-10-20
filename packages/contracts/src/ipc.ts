@@ -1,3 +1,4 @@
+import type { IrohEnrollmentInput, IrohEnrollmentResult } from "./iroh.ts";
 import * as Schema from "effect/Schema";
 import type { IrohSavedDevice, IrohGatewayOpen, IrohGatewayLease } from "./iroh.ts";
 
@@ -1027,6 +1028,8 @@ export const SystemSettingsPaneSchema = Schema.Literals(["full-disk-access"]);
 export type SystemSettingsPane = typeof SystemSettingsPaneSchema.Type;
 
 export interface DesktopBridge {
+  enrollIrohDevice?: (input: IrohEnrollmentInput) => Promise<IrohEnrollmentResult>;
+  forgetIrohDevice?: (profileId: string) => Promise<void>;
   getIrohDevices?: () => Promise<readonly IrohSavedDevice[]>;
   openIrohGateway?: (input: IrohGatewayOpen) => Promise<IrohGatewayLease>;
   closeIrohGateway?: (leaseId: string) => Promise<void>;

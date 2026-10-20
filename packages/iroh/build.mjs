@@ -4,6 +4,7 @@ import * as NodeCrypto from "node:crypto";
 import * as NodePath from "node:path";
 import * as NodeURL from "node:url";
 
+import { bindingTarget } from "./src/target.ts";
 import { IROH_BINDING_PATCH_SHA256 } from "./src/native.ts";
 
 // oxlint-disable-next-line t3code/no-global-process-runtime -- Build only for the actual host; cross-target mapping requires a native Windows runner.
@@ -22,11 +23,10 @@ function run(command, args, cwd = root) {
       `Build command failed: ${command} (exit ${result.status ?? result.error?.code})`,
     );
 }
-if (nativePlatform !== "linux" || !["x64", "arm64"].includes(nativeArch))
-  throw new Error("Only native Linux glibc builds are supported.");
+const target = bindingTarget(nativePlatform, nativeArch);
 if (!process.argv[2]) {
   NodeFS.mkdirSync(NodePath.join(root, ".generated"), { recursive: true });
-  run("git", ["clone", "https://github.com/n0-computer/iroh-ffi.git", source]);
+  run("git", ["-c", "core.autocrlf=false", "clone", "https://github.com/n0-computer/iroh-ffi.git", source]);
   run("git", ["checkout", "--detach", pin], source);
 }
 const rev = NodeChildProcess.spawnSync("git", ["rev-parse", "HEAD"], {
@@ -38,11 +38,10 @@ const patch = NodeFS.readFileSync(new URL("./patches/relay-only.patch", import.m
 const patchSha256 = NodeCrypto.createHash("sha256").update(patch).digest("hex");
 if (patchSha256 !== IROH_BINDING_PATCH_SHA256)
   throw new Error("Reviewed local patch hash mismatch.");
-const changes = NodeChildProcess.spawnSync(
-  "git",
-  ["diff", "--binary", pin],
-  { cwd: source, encoding: "utf8" },
-);
+const changes = NodeChildProcess.spawnSync("git", ["diff", "--binary", pin], {
+  cwd: source,
+  encoding: "utf8",
+});
 if (changes.status !== 0) throw new Error("Cannot inspect Iroh source changes.");
 if (changes.stdout.length === 0)
   run(
@@ -53,7 +52,18 @@ if (changes.stdout.length === 0)
 else if (changes.stdout !== patch.toString("utf8"))
   throw new Error("Iroh source has changes beyond the pinned relay-only patch.");
 // Cargo.lock is the reviewed upstream lock. No published 1.1.0 binary is accepted.
-run("cargo", ["build", "--locked", "--release", "--package", "number0_iroh"], source);
+run(
+  "cargo",
+  [
+    "build",
+    "--locked",
+    "--release",
+    "--package",
+    "number0_iroh",
+    ...(target.cargoTarget ? ["--target", target.cargoTarget] : []),
+  ],
+  source,
+);
 const binding = NodeURL.fileURLToPath(new URL("./binding/", import.meta.url));
 NodeFS.mkdirSync(binding, { recursive: true });
 NodeFS.writeFileSync(
@@ -70,9 +80,16 @@ NodeFS.copyFileSync(
   new URL("./patches/relay-only.patch", import.meta.url),
   NodePath.join(binding, "upstream.patch"),
 );
-const binary = `iroh.linux-${nativeArch}-gnu.node`;
+const binary = target.binary;
 NodeFS.copyFileSync(
-  NodePath.join(source, "target/release/libnumber0_iroh.so"),
+  NodePath.join(
+    process.env.CARGO_TARGET_DIR
+      ? NodePath.resolve(source, process.env.CARGO_TARGET_DIR)
+      : NodePath.join(source, "target"),
+    ...(target.cargoTarget ? [target.cargoTarget] : []),
+    "release",
+    target.library,
+  ),
   NodePath.join(binding, binary),
 );
 NodeFS.writeFileSync(
@@ -105,5 +122,5 @@ NodeFS.writeFileSync(
   ),
 );
 console.log(
-  `Built patched Iroh ${pin} for Linux ${nativeArch}. Run the upstream stream/watcher regressions before use.`,
+  `Built patched Iroh ${pin} for ${nativePlatform} ${nativeArch}. Run the upstream stream/watcher regressions before use.`,
 );

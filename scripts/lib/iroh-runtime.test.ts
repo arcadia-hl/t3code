@@ -1,3 +1,4 @@
+import * as NodeURL from "node:url";
 import * as NodeTest from "node:test";
 import * as NodeAssert from "node:assert/strict";
 import * as NodeFS from "node:fs";
@@ -25,15 +26,16 @@ NodeTest.test("Linux staging fails closed on missing or mismatched native build"
 });
 
 NodeTest.test(
-  "stages the verified Linux loader, patch, binary and notices as a local dependency",
+  "stages the verified native loader, patch, binary and notices as a local dependency",
   async (t) => {
     const stage = NodeFS.mkdtempSync(NodePath.join(NodeOS.tmpdir(), "t3-iroh-stage-real-"));
     t.after(() => NodeFS.rmSync(stage, { recursive: true, force: true }));
-    const source = new URL("../../packages/iroh/binding/", import.meta.url).pathname;
+    const source = NodeURL.fileURLToPath(new URL("../../packages/iroh/binding/", import.meta.url));
     const dependencies = await stageIrohRuntime({
       source,
       stage,
-      platform: "linux",
+      // oxlint-disable-next-line t3code/no-global-process-runtime -- Stage the binding built on this runner.
+      platform: process.platform === "win32" ? "win" : "linux",
       // oxlint-disable-next-line t3code/no-global-process-runtime -- This integration test stages the addon built for the current runner.
       arch: process.arch,
     });
@@ -52,5 +54,21 @@ NodeTest.test(
         .name,
       "@t3tools/iroh-binding",
     );
+  },
+);
+
+NodeTest.test(
+  "Windows packaging refuses an absent or Linux binding rather than omitting transport",
+  async (t) => {
+    const stage = NodeFS.mkdtempSync(NodePath.join(NodeOS.tmpdir(), "t3-iroh-win-stage-"));
+    t.after(() => NodeFS.rmSync(stage, { recursive: true, force: true }));
+    const absent = NodePath.join(stage, "absent");
+    await NodeAssert.rejects(
+      stageIrohRuntime({ source: absent, stage, platform: "win", arch: "x64" }),
+    );
+    const source = NodeURL.fileURLToPath(new URL("../../packages/iroh/binding/", import.meta.url));
+    // oxlint-disable-next-line t3code/no-global-process-runtime -- Compare the runner's actual addon with the opposite artifact target.
+    const opposite = process.platform === "win32" ? "linux" : "win";
+    await NodeAssert.rejects(stageIrohRuntime({ source, stage, platform: opposite, arch: "x64" }));
   },
 );

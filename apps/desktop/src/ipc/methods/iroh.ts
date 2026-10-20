@@ -1,4 +1,10 @@
-import { IrohGatewayOpen, IrohGatewayLease, IrohSavedDevice } from "@t3tools/contracts";
+import {
+  IrohEnrollmentInput,
+  IrohEnrollmentResult,
+  IrohGatewayOpen,
+  IrohGatewayLease,
+  IrohSavedDevice,
+} from "@t3tools/contracts";
 import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
@@ -69,5 +75,24 @@ export const close = DesktopIpc.makeIpcMethod({
   handler: Effect.fn("desktop.ipc.iroh.close")(function* (leaseId, event) {
     const owner = yield* sender(event);
     yield* (yield* DesktopIroh.DesktopIroh).close(leaseId, owner.ownerId);
+  }),
+});
+
+export const enroll = DesktopIpc.makeIpcMethod({
+  channel: Channels.IROH_ENROLL_CHANNEL,
+  payload: IrohEnrollmentInput,
+  result: IrohEnrollmentResult,
+  handler: Effect.fn("desktop.ipc.iroh.enroll")(function* (input, event) {
+    yield* sender(event);
+    return yield* (yield* DesktopIroh.DesktopIroh).enroll(input);
+  }),
+});
+export const forget = DesktopIpc.makeIpcMethod({
+  channel: Channels.IROH_FORGET_CHANNEL,
+  payload: IrohSavedDevice.fields.profileId,
+  result: Schema.Void,
+  handler: Effect.fn("desktop.ipc.iroh.forget")(function* (id, event) {
+    yield* sender(event);
+    yield* (yield* DesktopIroh.DesktopIroh).forget(id);
   }),
 });

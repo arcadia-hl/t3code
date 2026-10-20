@@ -8,4 +8,4 @@ packages/source-control-github/schema/** linguist-generated
 **/*.graphql.ts linguist-generated
 
 # Unified diff context preserves a required space on otherwise blank lines.
-packages/iroh/patches/*.patch -whitespace
+packages/iroh/patches/*.patch text eol=lf -whitespace

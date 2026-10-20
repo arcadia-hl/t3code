@@ -4,6 +4,7 @@ import * as NodePath from "node:path";
 import * as NodeURL from "node:url";
 import * as NodeCrypto from "node:crypto";
 import { validateRelayPolicy, type RelayPolicy, IROH_ALPN } from "./protocol.ts";
+import { bindingTarget } from "./target.ts";
 import type { Endpoint, EndpointAddr } from "./upstream.js";
 
 export const IROH_BINDING_PIN = "3103bf5295be6d50c5272ff7a426e9b539f3f587";
@@ -17,8 +18,7 @@ const nativePlatform = process.platform;
 const nativeArch = process.arch;
 
 export function loadNative(): Binding {
-  if (nativePlatform !== "linux")
-    throw new Error("Iroh transport currently supports native Linux only.");
+  const target = bindingTarget(nativePlatform, nativeArch);
   if (binding) return binding;
   try {
     const require = NodeModule.createRequire(import.meta.url);
@@ -31,10 +31,10 @@ export function loadNative(): Binding {
     const metadata = JSON.parse(
       NodeFS.readFileSync(NodePath.join(directory, "build.json"), "utf8"),
     );
-    const expected = `iroh.linux-${nativeArch}-gnu.node`;
+    const expected = target.binary;
     if (
       metadata.commit !== IROH_BINDING_PIN ||
-      metadata.platform !== "linux" ||
+      metadata.platform !== nativePlatform ||
       metadata.arch !== nativeArch ||
       metadata.binary !== expected ||
       metadata.patchSha256 !== IROH_BINDING_PATCH_SHA256

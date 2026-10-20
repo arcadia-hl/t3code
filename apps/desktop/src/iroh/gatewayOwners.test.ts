@@ -62,3 +62,37 @@ for (const ending of ["destroy", "shutdown"] as const)
       }),
     );
   });
+
+NodeTest.test("forget closes active and late gateways for a profile", async () => {
+  const owners = new GatewayOwners();
+  owners.observe(1, () => () => {});
+  let closed = 0;
+  await owners.open(
+    1,
+    async () => ({
+      close: async () => {
+        closed++;
+      },
+    }),
+    "profile",
+  );
+  let finish!: (gateway: { close(): Promise<void> }) => void;
+  const pending = owners.open(
+    1,
+    () =>
+      new Promise<{ close(): Promise<void> }>((r) => {
+        finish = r;
+      }),
+    "profile",
+  );
+  const denied = NodeAssert.rejects(pending);
+  await owners.closeKey("profile");
+  finish({
+    close: async () => {
+      closed++;
+    },
+  });
+  await denied;
+  NodeAssert.equal(closed, 2);
+  await NodeAssert.rejects(owners.open(1, async () => ({ close: async () => {} }), "profile"));
+});

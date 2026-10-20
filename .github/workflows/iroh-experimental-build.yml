@@ -1,0 +1,79 @@
+name: Iroh experimental Windows x64 artifact
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  windows-client:
+    runs-on: windows-2022
+    timeout-minutes: 90
+    env:
+      CARGO_BUILD_JOBS: 1
+      RUSTUP_TOOLCHAIN: 1.99.1
+      RAYON_NUM_THREADS: 1
+      T3CODE_DESKTOP_DEV: '0'
+      CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+      NODE_OPTIONS: --max-old-space-size=4096
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24.13.1
+      - name: Install project dependencies
+        run: |
+          npm install --global pnpm@11.10.0
+          pnpm install --frozen-lockfile
+      - name: Add project tools to PATH
+        shell: pwsh
+        run: '"${{ github.workspace }}/node_modules/.bin" >> $env:GITHUB_PATH'
+      - name: Install Electron
+        run: vp run --filter '@t3tools/desktop' ensure:electron
+      - name: Build reviewed native source
+        shell: pwsh
+        run: |
+          rustup toolchain install 1.99.1 --profile minimal
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          rustc --version
+          node packages/iroh/build.mjs
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+      - name: Native Node regressions and protected-store boundaries
+        run: node --import ./scripts/iroh-upstream-tests.mjs --test .generated/iroh-ffi/iroh-js/test/key.mjs .generated/iroh-ffi/iroh-js/test/relay.mjs .generated/iroh-ffi/iroh-js/test/endpoint.mjs packages/iroh/src/nativeCancellation.test.ts packages/iroh/src/nativeOverride.test.ts packages/iroh/src/target.test.ts scripts/lib/iroh-runtime.test.ts apps/desktop/src/iroh/encryptedProfiles.test.ts apps/desktop/src/iroh/gatewayOwners.test.ts
+      - name: Native Electron regressions
+        shell: pwsh
+        run: |
+          $env:ELECTRON_RUN_AS_NODE='1'
+          & apps/desktop/node_modules/electron/dist/electron.exe --import ./scripts/iroh-upstream-tests.mjs --test .generated/iroh-ffi/iroh-js/test/key.mjs .generated/iroh-ffi/iroh-js/test/relay.mjs .generated/iroh-ffi/iroh-js/test/endpoint.mjs packages/iroh/src/nativeCancellation.test.ts packages/iroh/src/nativeOverride.test.ts
+          exit $LASTEXITCODE
+      - name: Build unsigned experimental NSIS
+        shell: pwsh
+        run: |
+          $env:TEMP = Join-Path $env:RUNNER_TEMP 'iroh-package'
+          $env:TMP = $env:TEMP
+          New-Item -ItemType Directory -Force $env:TEMP | Out-Null
+          node scripts/build-desktop-artifact.ts --platform win --target nsis --arch x64 --build-version 0.1.0-preview.20261020.2 --output-dir artifacts/windows-x64 --keep-stage --verbose
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+      - name: Actual Windows protected storage without a browser window
+        shell: pwsh
+        run: |
+          & apps/desktop/node_modules/electron/dist/electron.exe apps/desktop/dist-electron/safeStorageProbe.cjs
+          exit $LASTEXITCODE
+      - name: Packaged ASAR native resolution
+        shell: pwsh
+        run: |
+          $stages = @(Get-ChildItem (Join-Path $env:RUNNER_TEMP 'iroh-package') -Directory -Filter 't3code-desktop-win-stage-*')
+          if ($stages.Count -ne 1) { throw 'Expected one owned packaging stage' }
+          $app = Join-Path $stages[0].FullName 'app/dist/win-unpacked'
+          $exe = Join-Path $app 'T3 Code Iroh (Experimental).exe'
+          $env:ELECTRON_RUN_AS_NODE='1'
+          & $exe (Join-Path $app 'resources/app.asar/apps/desktop/dist-electron/nativeProbe.cjs')
+          exit $LASTEXITCODE
+      - name: Artifact manifest
+        run: node scripts/iroh-artifact-manifest.mjs artifacts/windows-x64
+      - uses: actions/upload-artifact@v4
+        with:
+          name: t3-code-iroh-windows-x64-${{ github.sha }}
+          path: artifacts/windows-x64/
+          if-no-files-found: error
+          retention-days: 7

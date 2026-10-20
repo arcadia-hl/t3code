@@ -2116,6 +2116,8 @@ export function ConnectionsSettings() {
   const [routeTarget, setRouteTarget] = useState<EnvironmentPresentation | null>(null);
   const [savedBackendMode, setSavedBackendMode] = useState<"remote" | "ssh">("remote");
   const [savedBackendHost, setSavedBackendHost] = useState("");
+  const [irohControl, setIrohControl] = useState(false);
+  const isIrohInvitation = savedBackendHost.trim().startsWith("t3-iroh://");
   const [savedBackendPairingCode, setSavedBackendPairingCode] = useState("");
   const [savedBackendSshHost, setSavedBackendSshHost] = useState("");
   const [savedBackendSshUsername, setSavedBackendSshUsername] = useState("");
@@ -2510,6 +2512,37 @@ export function ConnectionsSettings() {
       return;
     }
 
+    if (isIrohInvitation) {
+      const link = savedBackendHost.trim();
+      setSavedBackendHost("");
+      if (routeTarget) {
+        setSavedBackendError(
+          "Add the Iroh invitation as a new environment so its pinned identity can be verified.",
+        );
+        return;
+      }
+      setIsAddingSavedBackend(true);
+      setSavedBackendError(null);
+      try {
+        const enroll = window.desktopBridge?.enrollIrohDevice;
+        if (!enroll)
+          throw new Error("Iroh enrollment requires the native Linux or Windows desktop app.");
+        const pending = await enroll({ link, control: irohControl });
+        toastManager.add({
+          type: "info",
+          title: "Approve this device on the Linux host",
+          description: `Pending device: ${pending.deviceId}. Use iroh approve with matching read or control scopes.`,
+          timeout: 0,
+        });
+      } catch {
+        setSavedBackendError(
+          "Iroh enrollment failed. Check the invitation, host identity and protected storage. Request a new invitation if this one was consumed.",
+        );
+      } finally {
+        setIsAddingSavedBackend(false);
+      }
+      return;
+    }
     setIsAddingSavedBackend(true);
     setSavedBackendError(null);
     let remotePairingInput: ReturnType<typeof parseRemotePairingFields>;
@@ -2665,6 +2698,18 @@ export function ConnectionsSettings() {
     const environmentId = environment.environmentId;
     setRemovingSavedEnvironmentId(environmentId);
     setSavedBackendError(null);
+    const native = Option.getOrUndefined(environment.entry.profile);
+    if (native?._tag === "BearerConnectionProfile" && native.iroh) {
+      try {
+        const forget = window.desktopBridge?.forgetIrohDevice;
+        if (!forget) throw new Error("Native profile removal is unavailable.");
+        await forget(native.iroh.profileId);
+      } catch {
+        setSavedBackendError("Could not forget the protected Iroh profile.");
+        setRemovingSavedEnvironmentId(null);
+        return;
+      }
+    }
     const result = await removeEnvironment(environmentId);
     setRemovingSavedEnvironmentId(null);
     if (result._tag === "Failure" && !isAtomCommandInterrupted(result)) {
@@ -2786,20 +2831,32 @@ export function ConnectionsSettings() {
             spellCheck={false}
           />
         </label>
-        <label className="block">
-          <span className="mb-1.5 block text-xs font-medium text-foreground">Pairing code</span>
-          <Input
-            value={savedBackendPairingCode}
-            onChange={(event) => setSavedBackendPairingCode(event.target.value)}
-            placeholder="PAIRCODE"
-            disabled={isAddingSavedBackend}
-            spellCheck={false}
-          />
-        </label>
+        {!isIrohInvitation && (
+          <label className="block">
+            <span className="mb-1.5 block text-xs font-medium text-foreground">Pairing code</span>
+            <Input
+              value={savedBackendPairingCode}
+              onChange={(event) => setSavedBackendPairingCode(event.target.value)}
+              placeholder="PAIRCODE"
+              disabled={isAddingSavedBackend}
+              spellCheck={false}
+            />
+          </label>
+        )}
       </div>
+      {isIrohInvitation && (
+        <label className="flex items-center gap-2 text-xs">
+          <Checkbox
+            checked={irohControl}
+            onCheckedChange={(checked) => setIrohControl(checked === true)}
+            disabled={isAddingSavedBackend}
+          />
+          Allow commands as the host user (host must also approve control).
+        </label>
+      )}
       <div>
         <span className="mt-1 block text-2xs text-muted-foreground">
-          Paste a full pairing URL here to fill both fields automatically.
+          Paste a full pairing URL. Native desktop also accepts a one-time t3-iroh invitation link.
         </span>
       </div>
     </div>

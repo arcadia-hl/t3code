@@ -85,6 +85,8 @@ import {
 
 export const installDesktopIpcHandlers = Effect.fn("desktop.ipc.installHandlers")(function* () {
   const ipc = yield* DesktopIpc.DesktopIpc;
+  yield* ipc.handle(Iroh.enroll);
+  yield* ipc.handle(Iroh.forget);
   yield* ipc.handle(Iroh.devices);
   yield* ipc.handle(Iroh.open);
   yield* ipc.handle(Iroh.close);

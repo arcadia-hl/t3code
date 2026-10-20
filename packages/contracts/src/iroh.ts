@@ -73,3 +73,15 @@ export const IrohLocalAdminRequest = Schema.Union([
   Schema.Struct({ operation: Schema.Literal("revoke-invitation"), invitationId: BoundedId }),
 ]);
 export type IrohLocalAdminRequest = typeof IrohLocalAdminRequest.Type;
+
+export const IrohEnrollmentInput = Schema.Struct({
+  link: Schema.String.check(Schema.isMaxLength(8192)),
+  control: Schema.Boolean,
+});
+export type IrohEnrollmentInput = typeof IrohEnrollmentInput.Type;
+export const IrohEnrollmentResult = Schema.Struct({
+  profileId: BoundedId,
+  deviceId: BoundedId,
+  status: Schema.Literal("pending"),
+});
+export type IrohEnrollmentResult = typeof IrohEnrollmentResult.Type;

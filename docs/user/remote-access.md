@@ -30,12 +30,12 @@ connection. Pull request diffs and provider settings keep working after the
 previous credential expires. A failed renewal affects that request; it does not
 disconnect an otherwise healthy conversation.
 
-## Linux Iroh (experimental source builds)
+## Native Iroh (experimental builds)
 
-Iroh provides an accountless route between a Linux host and the native Linux
-desktop app. It requires the patched native binding built from this checkout;
-mobile, macOS, Windows, and browser clients cannot use this route yet. Existing
-local, SSH, private-network, and T3 Connect routes remain available.
+Iroh provides an accountless route from the native Linux and Windows x64 desktop
+apps to a Linux host. These experimental builds require the patched native
+binding built from this checkout. Windows hosting, mobile, macOS, and browser
+clients are unsupported. Existing local, SSH, private-network, and T3 Connect routes remain available.
 
 Use a separate private T3 base directory. Its ancestors must reject group and
 other writes (a shared sticky directory is allowed); the base and `userdata`
@@ -60,7 +60,16 @@ paste the link into stdin, followed by Enter:
 t3 iroh pair --profiles-dir <desktop-base>/userdata/iroh-client
 ```
 
-The command prints a device ID. Verify that ID with the person enrolling, then
+Alternatively, in the Linux or Windows desktop app, open **Settings → Connections**,
+add a remote host, and paste the invitation in the Host field. Select command
+access only when the invitation and host approval also allow it. Windows stores
+the entire device profile with Electron protected storage; it refuses pairing
+when that storage is unavailable. Profiles are bound to the Windows user and
+app data, so copying Linux profile files to Windows is unsupported. The desktop
+uses public relays; custom private relay enrollment currently requires the Linux
+CLI.
+
+The command or desktop notification shows a pending device ID. Verify that ID with the person enrolling, then
 approve it locally on the host:
 
 ```bash
@@ -78,7 +87,8 @@ Remove a device with `t3 iroh revoke-device <device-id> --state-dir
 <private-base>/userdata`. This invalidates its sessions and closes its Iroh
 connections. Revoking an invitation with `revoke-invitation <invitation-id>`
 only prevents unused enrollment. `forget <profile-id> --profiles-dir <path>`
-removes a client profile; it does not revoke its host grant. Already issued
+removes a Linux CLI client profile; removing the native connection in desktop
+forgets its local profile and closes its gateways. Forgetting it does not revoke its host grant. Already issued
 signed asset URLs can remain valid for up to one hour through another reachable
 route.
 

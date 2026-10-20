@@ -7,7 +7,8 @@ type Gateway = { close(): Promise<void> };
 // Keep the owner tombstone until shutdown so that late acquisitions close too.
 export class GatewayOwners {
   private readonly owners = new Map<number, { alive: boolean; unsubscribe: () => void }>();
-  private readonly leases = new Map<string, { ownerId: number; gateway: Gateway }>();
+  private readonly leases = new Map<string, { ownerId: number; gateway: Gateway; key?: string }>();
+  private readonly forgotten = new Set<string>();
   private pending = 0;
   private stopped = false;
 
@@ -25,19 +26,25 @@ export class GatewayOwners {
   async open<A extends Gateway>(
     ownerId: number,
     acquire: () => Promise<A>,
+    key?: string,
   ): Promise<{ id: string; gateway: A }> {
     const owner = this.owners.get(ownerId);
-    if (this.stopped || !owner?.alive || this.leases.size + this.pending >= 16)
+    if (
+      this.stopped ||
+      (key !== undefined && this.forgotten.has(key)) ||
+      !owner?.alive ||
+      this.leases.size + this.pending >= 16
+    )
       throw new Error("Gateway owner unavailable or capacity reached.");
     this.pending++;
     try {
       const gateway = await acquire();
-      if (this.stopped || !owner.alive) {
+      if (this.stopped || !owner.alive || (key !== undefined && this.forgotten.has(key))) {
         await gateway.close();
         throw new Error("Gateway owner closed during acquisition.");
       }
       const id = NodeCrypto.randomUUID();
-      this.leases.set(id, { ownerId, gateway });
+      this.leases.set(id, { ownerId, gateway, ...(key === undefined ? {} : { key }) });
       return { id, gateway };
     } finally {
       this.pending--;
@@ -61,6 +68,13 @@ export class GatewayOwners {
     const owned = [...this.leases].filter(([, lease]) => lease.ownerId === ownerId);
     for (const [id] of owned) this.leases.delete(id);
     await Promise.all(owned.map(([, lease]) => lease.gateway.close()));
+  }
+
+  async closeKey(key: string): Promise<void> {
+    this.forgotten.add(key);
+    const matching = [...this.leases].filter(([, lease]) => lease.key === key);
+    for (const [id] of matching) this.leases.delete(id);
+    await Promise.all(matching.map(([, lease]) => lease.gateway.close()));
   }
 
   async shutdown(): Promise<void> {

@@ -75,6 +75,8 @@ function unwrapEnsureSshEnvironmentResult(result: unknown) {
 }
 
 contextBridge.exposeInMainWorld("desktopBridge", {
+  enrollIrohDevice: (input) => ipcRenderer.invoke(IpcChannels.IROH_ENROLL_CHANNEL, input),
+  forgetIrohDevice: (id) => ipcRenderer.invoke(IpcChannels.IROH_FORGET_CHANNEL, id),
   getIrohDevices: () => ipcRenderer.invoke(IpcChannels.IROH_DEVICES_CHANNEL),
   openIrohGateway: (input) => ipcRenderer.invoke(IpcChannels.IROH_OPEN_CHANNEL, input),
   closeIrohGateway: (leaseId) => ipcRenderer.invoke(IpcChannels.IROH_CLOSE_CHANNEL, leaseId),

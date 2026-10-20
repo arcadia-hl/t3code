@@ -16,7 +16,7 @@ import { assertPinnedHost, deadline, irohDuplex, readControl, writeControl } fro
 import { fixedHttpProxy, gatewayAccess, createDpopProof, listenGateway } from "./gateway.ts";
 import type { Connection } from "./upstream.js";
 
-interface DeviceProfile {
+export interface DeviceProfile {
   readonly version: 1;
   readonly profileId: string;
   readonly hostId: string;
@@ -41,11 +41,18 @@ const record = (value: unknown): Record<string, unknown> => {
   return value as Record<string, unknown>;
 };
 
-export function readDeviceProfile(directory: string, profileId: string): DeviceProfile {
-  if (!/^[a-f0-9-]{36}$/.test(profileId)) throw new Error("Invalid Iroh device profile.");
-  const bytes = readPrivateFile(NodePath.join(directory, `${profileId}.json`), 16 * 1024);
+export interface DeviceProfileStore {
+  read(profileId: string): Promise<DeviceProfile>;
+  create(profile: DeviceProfile): Promise<void>;
+  list(): Promise<
+    readonly { profileId: string; hostId: string; environmentId: string; label: string }[]
+  >;
+  forget(profileId: string): Promise<void>;
+}
+export function validateDeviceProfile(value: unknown, profileId: string): DeviceProfile {
+  if (!/^[a-f0-9-]{36}$/.test(profileId)) throw new Error("Invalid Iroh profile ID.");
   try {
-    const data = record(JSON.parse(bytes.toString("utf8")));
+    const data = record(value);
     if (
       data.version !== 1 ||
       data.profileId !== profileId ||
@@ -77,6 +84,35 @@ export function readDeviceProfile(directory: string, profileId: string): DeviceP
       relays: data.relays,
       scopes: data.scopes,
     };
+  } catch {
+    throw new Error("Invalid Iroh device profile. Profile was not replaced.");
+  }
+}
+export function fileProfileStore(directory: string): DeviceProfileStore {
+  return {
+    read: async (id) => readDeviceProfile(directory, id),
+    list: async () => savedDevices(directory),
+    create: async (profile) => {
+      ensurePrivateDirectory(directory);
+      const bytes = Buffer.from(JSON.stringify(profile));
+      try {
+        publishPrivateFile(NodePath.join(directory, `${profile.profileId}.json`), bytes);
+      } finally {
+        bytes.fill(0);
+      }
+    },
+    forget: async (id) => {
+      readDeviceProfile(directory, id);
+      NodeFS.unlinkSync(NodePath.join(directory, `${id}.json`));
+    },
+  };
+}
+
+export function readDeviceProfile(directory: string, profileId: string): DeviceProfile {
+  if (!/^[a-f0-9-]{36}$/.test(profileId)) throw new Error("Invalid Iroh device profile.");
+  const bytes = readPrivateFile(NodePath.join(directory, `${profileId}.json`), 16 * 1024);
+  try {
+    return validateDeviceProfile(JSON.parse(bytes.toString("utf8")), profileId);
   } catch {
     throw new Error("Invalid Iroh device profile. Profile was not replaced.");
   } finally {
@@ -170,6 +206,7 @@ async function challenge(
 export async function enrollDevice(input: {
   readonly link: string;
   readonly directory: string;
+  readonly store?: DeviceProfileStore;
   readonly scopes: readonly string[];
   readonly relayPolicy: RelayPolicy;
   readonly signal?: AbortSignal;
@@ -216,7 +253,6 @@ export async function enrollDevice(input: {
       !/^[a-f0-9-]{36}$/.test(result.deviceId)
     )
       throw new Error("Invalid enrollment response.");
-    ensurePrivateDirectory(input.directory);
     const profileId = NodeCrypto.randomUUID();
     const profile: DeviceProfile = {
       version: 1,
@@ -230,12 +266,7 @@ export async function enrollDevice(input: {
       relayPolicy: input.relayPolicy,
       relays: invitation.relays,
     };
-    const bytes = Buffer.from(JSON.stringify(profile));
-    try {
-      publishPrivateFile(NodePath.join(input.directory, `${profileId}.json`), bytes);
-    } finally {
-      bytes.fill(0);
-    }
+    await (input.store ?? fileProfileStore(input.directory)).create(profile);
     return { profileId, deviceId: result.deviceId, status: "pending" as const };
   } finally {
     await client.close();
@@ -244,13 +275,14 @@ export async function enrollDevice(input: {
 
 export async function openClientGateway(input: {
   readonly directory: string;
+  readonly store?: DeviceProfileStore;
   readonly profileId: string;
   readonly expectedHostId: string;
   readonly expectedEnvironmentId: string;
   readonly allowedOrigin: string;
   readonly signal?: AbortSignal;
 }) {
-  const profile = readDeviceProfile(input.directory, input.profileId);
+  const profile = await (input.store ?? fileProfileStore(input.directory)).read(input.profileId);
   if (
     profile.hostId !== input.expectedHostId ||
     profile.environmentId !== input.expectedEnvironmentId
