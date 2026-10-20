@@ -337,7 +337,17 @@ export function serializeTableElementToCsv(table: Element): string {
       (cell) => cell.tagName === "TH" || cell.tagName === "TD",
     );
     if (cells.length === 0) continue;
-    lines.push(cells.map((cell) => csvCell(cell.textContent ?? "")).join(","));
+    lines.push(
+      cells
+        .map((cell) => {
+          const clone = cell.cloneNode(true) as Element;
+          for (const node of clone.querySelectorAll("[data-markdown-copy-text]")) {
+            node.textContent = node.getAttribute("data-markdown-copy-text");
+          }
+          return csvCell(clone.textContent ?? "");
+        })
+        .join(","),
+    );
   }
   return lines.join("\n");
 }
