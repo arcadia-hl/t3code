@@ -81,6 +81,11 @@ async function invitationFromStdin(): Promise<string> {
   return value.trim();
 }
 export async function runIrohCli(args: readonly string[]) {
+  // oxlint-disable-next-line t3code/no-global-process-runtime -- POSIX host/admin and plaintext owner-only CLI profiles must reject the actual Windows process.
+  if (process.platform !== "linux")
+    throw new Error(
+      "Iroh hosting and headless pairing require Linux. Use the Windows x64 desktop client to enroll with protected storage.",
+    );
   const command = args[0];
   const scopes = args.includes("--control") ? [...AuthStandardClientScopes] : readScopes;
   if (command === "help" || !command) {

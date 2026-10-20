@@ -11,6 +11,7 @@ jobs:
     timeout-minutes: 90
     env:
       CARGO_BUILD_JOBS: 1
+      CARGO_PROFILE_RELEASE_LTO: 'off'
       RUSTUP_TOOLCHAIN: 1.99.1
       RAYON_NUM_THREADS: 1
       T3CODE_DESKTOP_DEV: '0'
@@ -60,7 +61,7 @@ jobs:
           node packages/iroh/build.mjs
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
       - name: Native Node regressions and protected-store boundaries
-        run: node --import ./scripts/iroh-upstream-tests.mjs --test .generated/iroh-ffi/iroh-js/test/key.mjs .generated/iroh-ffi/iroh-js/test/relay.mjs .generated/iroh-ffi/iroh-js/test/endpoint.mjs packages/iroh/src/nativeCancellation.test.ts packages/iroh/src/nativeOverride.test.ts packages/iroh/src/target.test.ts scripts/lib/iroh-runtime.test.ts apps/desktop/src/iroh/encryptedProfiles.test.ts apps/desktop/src/iroh/gatewayOwners.test.ts
+        run: node --import ./scripts/iroh-upstream-tests.mjs --test .generated/iroh-ffi/iroh-js/test/key.mjs .generated/iroh-ffi/iroh-js/test/relay.mjs .generated/iroh-ffi/iroh-js/test/endpoint.mjs packages/iroh/src/nativeCancellation.test.ts packages/iroh/src/nativeOverride.test.ts packages/iroh/src/target.test.ts scripts/lib/iroh-runtime.test.ts apps/server/src/iroh/cli.test.ts apps/desktop/src/iroh/encryptedProfiles.test.ts apps/desktop/src/iroh/gatewayOwners.test.ts
       - name: Native Electron regressions
         shell: pwsh
         run: |

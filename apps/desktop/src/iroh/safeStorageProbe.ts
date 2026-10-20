@@ -7,6 +7,7 @@ import * as NodeCrypto from "node:crypto";
 import * as NodeAssert from "node:assert/strict";
 import { encryptedProfileStore } from "./encryptedProfiles.ts";
 const root = NodeFS.mkdtempSync(NodePath.join(NodeOS.tmpdir(), "t3-iroh-dpapi-"));
+NodeFS.mkdirSync(NodePath.join(root, "electron"));
 Electron.app.setPath("userData", NodePath.join(root, "electron"));
 async function probe() {
   await Electron.app.whenReady();

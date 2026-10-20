@@ -1,3 +1,4 @@
+// @effect-diagnostics globalTimers:off -- Native connection callbacks release admission synchronously outside Effect fibers; authorization/removal cancels each timer.
 // Retain admission until the native handshake settles, including after a timeout.
 // Revocation tombstones cover renewal callbacks that arrive after removal commits.
 export class TransportAdmission<C extends { close(code: bigint, reason: number[]): void }> {
