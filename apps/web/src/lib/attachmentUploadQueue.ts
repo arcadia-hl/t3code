@@ -291,7 +291,7 @@ async function runUpload(job: UploadJob): Promise<void> {
         return null;
       }
       const connection = readPreparedConnection(job.environmentId);
-      return connection ? resolveAssetUrl(connection.httpBaseUrl, relativeUrl) : null;
+      return connection ? resolveAssetUrl(connection.httpBaseUrl, relativeUrl, connection) : null;
     },
     transport: (url) =>
       uploadBytes({

@@ -12,6 +12,7 @@ import * as NodeServices from "@effect/platform-node/NodeServices";
 import * as NodeFS from "node:fs";
 import * as NodeOS from "node:os";
 import * as Effect from "effect/Effect";
+import * as DesktopIroh from "./iroh/DesktopIroh.ts";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 
@@ -210,6 +211,7 @@ const layerDesktopApplication = Layer.mergeAll(
   DesktopLinuxUrlHandler.layer,
   DesktopCliCommand.layer,
   layerDesktopSsh,
+  DesktopIroh.layer,
 ).pipe(
   Layer.provideMerge(layerDesktopSnapShot),
   Layer.provideMerge(DesktopUpdates.layer),

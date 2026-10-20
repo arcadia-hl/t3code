@@ -1,0 +1,21 @@
+{
+  "name": "@t3tools/iroh",
+  "private": true,
+  "license": "MIT",
+  "type": "module",
+  "exports": {
+    "./keys": "./src/keys.ts",
+    "./native": "./src/native.ts",
+    "./transport": "./src/transport.ts",
+    "./gateway": "./src/gateway.ts",
+    "./protocol": "./src/protocol.ts",
+    "./client": "./src/client.ts"
+  },
+  "scripts": {
+    "build:native": "node build.mjs",
+    "test": "node --test src/*.test.ts"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:"
+  }
+}

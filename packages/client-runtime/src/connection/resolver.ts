@@ -140,6 +140,12 @@ const makeBearerBroker = Effect.fn("clientRuntime.connection.broker.makeBearer")
         actual: profile.environmentId,
       });
     }
+    if (profile.iroh !== undefined)
+      return yield* new ConnectionBlockedError({
+        reason: "unsupported",
+        detail:
+          "Iroh connections require a scoped native attempt. Update this host through its local CLI.",
+      });
     if (profile.authorization === "t3-connect") {
       const authorized = yield* remote.authorizeDpop({
         expectedEnvironmentId: target.environmentId,

@@ -5,6 +5,15 @@ import * as Fiber from "effect/Fiber";
 import * as Layer from "effect/Layer";
 import * as Scope from "effect/Scope";
 import * as HttpClient from "effect/http/HttpClient";
+import * as FetchHttpClient from "effect/http/FetchHttpClient";
+import * as Option from "effect/Option";
+import * as ClientCapabilities from "../platform/capabilities.ts";
+import { ConnectionBlockedError } from "./model.ts";
+import {
+  appendOrchestrationProtocol,
+  orchestrationProtocolCompatibilityError,
+} from "./compatibility.ts";
+import { environmentMismatchError, mapRemoteEnvironmentError } from "./errors.ts";
 
 import type { ConnectionCatalogEntry, ConnectionRoute } from "./catalog.ts";
 import type {
@@ -157,7 +166,48 @@ export const make = Effect.gen(function* () {
       entry,
       (route) => checkRoute(entry, route),
       Effect.fnUntraced(function* (route) {
-        const prepared = yield* resolver.prepare(routeEntry(entry, route));
+        const profile = Option.getOrNull(route.profile);
+        let prepared: PreparedConnection;
+        if (profile?._tag === "BearerConnectionProfile" && profile.iroh !== undefined) {
+          const native = yield* Effect.serviceOption(ClientCapabilities.IrohEnvironmentGateway);
+          if (Option.isNone(native))
+            return yield* new ConnectionBlockedError({
+              reason: "unsupported",
+              detail:
+                "Iroh requires the Linux desktop native gateway. Mobile and browser clients are not supported.",
+            });
+          const gateway = yield* native.value.prepare({
+            ...profile.iroh,
+            environmentId: route.target.environmentId,
+          });
+          const descriptor = yield* fetchRemoteEnvironmentDescriptor({
+            httpBaseUrl: gateway.httpBaseUrl,
+          }).pipe(
+            Effect.provideService(HttpClient.HttpClient, httpClient),
+            Effect.provideService(FetchHttpClient.RequestInit, {
+              headers: { authorization: `Bearer ${gateway.gatewayToken}` },
+            }),
+            Effect.mapError(mapRemoteEnvironmentError),
+          );
+          if (descriptor.environmentId !== route.target.environmentId)
+            return yield* environmentMismatchError({
+              expected: route.target.environmentId,
+              actual: descriptor.environmentId,
+            });
+          const compatibility = orchestrationProtocolCompatibilityError(descriptor);
+          if (compatibility !== null) return yield* compatibility;
+          prepared = {
+            environmentId: route.target.environmentId,
+            label: route.target.label,
+            httpBaseUrl: gateway.httpBaseUrl,
+            socketUrl: appendOrchestrationProtocol(gateway.socketUrl),
+            httpAuthorization: { _tag: "Bearer", token: gateway.gatewayToken },
+            nativeTransport: "iroh",
+            target: route.target,
+          };
+        } else {
+          prepared = yield* resolver.prepare(routeEntry(entry, route));
+        }
         yield* reportProgress({ stage: "opening", prepared });
         const session = yield* sessions.connect(prepared);
         yield* reportProgress({ stage: "synchronizing", prepared });

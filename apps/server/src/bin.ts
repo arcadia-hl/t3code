@@ -14,7 +14,17 @@ if (
   })
 ) {
   const command = process.argv[2];
-  if (command === "acp-mcp-bridge" || command === "acp-mcp-call") {
+  if (command === "iroh") {
+    const { runIrohCli } = await import("./iroh/cli.ts");
+    try {
+      await runIrohCli(process.argv.slice(3));
+    } catch {
+      console.error(
+        "Iroh command failed. Check explicit paths, approval, identity permissions and the patched native build.",
+      );
+      process.exitCode = 1;
+    }
+  } else if (command === "acp-mcp-bridge" || command === "acp-mcp-call") {
     const { runAcpMcpCliFastPath } = await import("./mcp/AcpMcpStdioBridge.ts");
     await runAcpMcpCliFastPath(command, process.argv.slice(3));
   } else {

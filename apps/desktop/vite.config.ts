@@ -69,6 +69,20 @@ export default defineConfig({
       dts: false,
       sourcemap: true,
       outExtensions: () => ({ js: ".cjs" }),
+      entry: ["src/iroh/nativeProbe.ts"],
+      clean: false,
+      deps: {
+        alwaysBundle: (id) => !id.startsWith("node:") && !isMainProcessExternal(id),
+        neverBundle: isMainProcessExternal,
+        onlyBundle: false,
+      },
+    },
+    {
+      format: "cjs",
+      outDir: "dist-electron",
+      dts: false,
+      sourcemap: true,
+      outExtensions: () => ({ js: ".cjs" }),
       define: publicConfigDefine,
       entry: [
         "src/electron/WindowsForegroundFocusWorker.ts",

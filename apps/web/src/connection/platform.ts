@@ -7,6 +7,7 @@ import {
   BearerConnectionCredential,
   BearerConnectionProfile,
   BearerConnectionRegistration,
+  IrohConnectionRegistration,
   BearerConnectionTarget,
   ConnectionBlockedError,
   type ConnectionAttemptError,
@@ -324,6 +325,30 @@ const layerCapabilities = Layer.effectContext(
           }),
       }).pipe(Effect.map(Option.fromNullishOr)),
     });
+    const iroh = ClientCapabilities.IrohEnvironmentGateway.of({
+      prepare: Effect.fn("web.connectionPlatform.iroh.prepare")(function* (input) {
+        const bridge = window.desktopBridge;
+        if (!bridge?.openIrohGateway || !bridge.closeIrohGateway)
+          return yield* new ConnectionBlockedError({
+            reason: "unsupported",
+            detail: "Iroh requires the Linux desktop native gateway.",
+          });
+        const open = bridge.openIrohGateway;
+        const close = bridge.closeIrohGateway;
+        return yield* Effect.acquireRelease(
+          Effect.tryPromise({
+            try: () => open(input),
+            catch: () =>
+              new ConnectionTransientError({
+                reason: "remote-unavailable",
+                detail:
+                  "Iroh connection failed. Check host approval, native build and relay connectivity.",
+              }),
+          }),
+          (lease) => Effect.promise(() => close(lease.leaseId)).pipe(Effect.ignore),
+        );
+      }),
+    });
     const ssh = ClientCapabilities.SshEnvironmentGateway.of({
       provision: Effect.fn("web.connectionPlatform.ssh.provision")(
         function* (target, expectedEnvironmentId) {
@@ -368,6 +393,7 @@ const layerCapabilities = Layer.effectContext(
       Context.add(ClientCapabilities.RelayDeviceIdentity, identity),
       Context.add(ClientCapabilities.ClientPresentation, presentation),
       Context.add(ClientCapabilities.SshEnvironmentGateway, ssh),
+      Context.add(ClientCapabilities.IrohEnvironmentGateway, iroh),
     );
   }),
 );
@@ -584,14 +610,51 @@ export function secondaryRegistrationsToRetainAfterTopologyRead(
   );
 }
 
+const nativeIrohRegistrations = Effect.tryPromise({
+  try: async () => (await window.desktopBridge?.getIrohDevices?.()) ?? [],
+  catch: () =>
+    new ConnectionTransientError({
+      reason: "remote-unavailable",
+      detail: "Could not load native Iroh devices.",
+    }),
+}).pipe(
+  Effect.map((devices) =>
+    devices.map((device) => {
+      const connectionId = `iroh:${device.profileId}`;
+      return new IrohConnectionRegistration({
+        target: new BearerConnectionTarget({
+          environmentId: device.environmentId,
+          label: device.label,
+          connectionId,
+        }),
+        profile: new BearerConnectionProfile({
+          environmentId: device.environmentId,
+          label: device.label,
+          connectionId,
+          httpBaseUrl: `http://${device.hostId.slice(0, 32)}.${device.hostId.slice(32)}.iroh.invalid`,
+          wsBaseUrl: `ws://${device.hostId.slice(0, 32)}.${device.hostId.slice(32)}.iroh.invalid`,
+          iroh: { profileId: device.profileId, hostId: device.hostId },
+        }),
+      });
+    }),
+  ),
+  Effect.orElseSucceed(() => []),
+);
+
 const layerPlatformConnectionSource = Layer.effect(
   PlatformConnectionSource.PlatformConnectionSource,
   Effect.gen(function* () {
-    if (isHostedStaticApp() || isLocalEnvironmentDisabled()) {
+    if (isHostedStaticApp()) {
       return PlatformConnectionSource.PlatformConnectionSource.of({
         registrations: Stream.empty,
       });
     }
+    if (isLocalEnvironmentDisabled())
+      return PlatformConnectionSource.PlatformConnectionSource.of({
+        registrations: Stream.tick(PLATFORM_POLL_INTERVAL).pipe(
+          Stream.mapEffect(() => nativeIrohRegistrations),
+        ),
+      });
     const cacheRef = yield* Ref.make(new Map<string, CachedPlatformRegistration>());
     const rejectedRef = yield* Ref.make(new Map<string, RejectedSecondaryBootstrap>());
 
@@ -746,6 +809,14 @@ const layerPlatformConnectionSource = Layer.effect(
       }
 
       yield* Ref.set(cacheRef, next);
+      const native = yield* nativeIrohRegistrations;
+      for (const registration of native)
+        if (
+          !registrations.some(
+            (current) => current.target.environmentId === registration.target.environmentId,
+          )
+        )
+          registrations.push(registration);
       return registrations as ReadonlyArray<PlatformConnectionRegistration>;
     }).pipe(Effect.provide(FetchHttpClient.layer));
 

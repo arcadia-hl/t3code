@@ -15,6 +15,7 @@ import {
 import { BearerConnectionTarget, type ConnectionTarget } from "./model.ts";
 
 export type ConnectionRouteKind =
+  | "iroh"
   | "relay"
   | "loopback"
   | "lan"
@@ -68,7 +69,9 @@ export function routeEntry(
 export function routeHttpBaseUrl(route: ConnectionRoute): string | null {
   if (route.target._tag === "PrimaryConnectionTarget") return route.target.httpBaseUrl;
   const profile = Option.getOrNull(route.profile);
-  return profile?._tag === "BearerConnectionProfile" ? profile.httpBaseUrl : null;
+  return profile?._tag === "BearerConnectionProfile" && profile.iroh === undefined
+    ? profile.httpBaseUrl
+    : null;
 }
 
 function routeHostname(route: ConnectionRoute): string | null {
@@ -82,6 +85,8 @@ function routeHostname(route: ConnectionRoute): string | null {
 }
 
 export function connectionRouteKind(route: ConnectionRoute): ConnectionRouteKind {
+  const profile = Option.getOrNull(route.profile);
+  if (profile?._tag === "BearerConnectionProfile" && profile.iroh !== undefined) return "iroh";
   switch (route.target._tag) {
     case "RelayConnectionTarget":
       return "relay";
@@ -109,6 +114,7 @@ const ROUTE_KIND_RANK: Record<ConnectionRouteKind, number> = {
   vpn: 2,
   public: 3,
   ssh: 4,
+  iroh: 4,
   relay: 5,
 };
 
@@ -147,7 +153,9 @@ function routeAddressKey(route: ConnectionRoute): string | null {
   const profile = Option.getOrNull(route.profile);
   switch (profile?._tag) {
     case "BearerConnectionProfile":
-      return `bearer:${profile.httpBaseUrl.replace(/\/+$/, "")}`;
+      return profile.iroh
+        ? `iroh:${profile.iroh.hostId}:${profile.iroh.profileId}`
+        : `bearer:${profile.httpBaseUrl.replace(/\/+$/, "")}`;
     case "SshConnectionProfile":
       return `ssh:${sshTargetKey(profile.target)}`;
     default:
@@ -157,6 +165,8 @@ function routeAddressKey(route: ConnectionRoute): string | null {
 
 export function connectionRouteLabel(route: ConnectionRoute): string {
   switch (connectionRouteKind(route)) {
+    case "iroh":
+      return "Iroh";
     case "relay":
       return "T3 Connect";
     case "loopback":
@@ -212,6 +222,8 @@ export function mergeLearnedRoutes(input: {
     return null;
   }
   const activeProfile = Option.getOrNull(input.activeRoute.profile);
+  if (activeProfile?._tag === "BearerConnectionProfile" && activeProfile.iroh !== undefined)
+    return null;
   const authorization =
     active._tag === "RelayConnectionTarget" ||
     (activeProfile?._tag === "BearerConnectionProfile" &&

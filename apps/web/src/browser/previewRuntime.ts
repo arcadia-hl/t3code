@@ -2,6 +2,7 @@ import { useAtomValue } from "@effect/atom-react";
 import type { EnvironmentId, PreviewRuntime, PreviewSessionSnapshot } from "@t3tools/contracts";
 
 import { isElectron } from "~/env";
+import { readPreparedConnection } from "~/state/session";
 import { isPreviewSupportedInRuntime } from "~/previewStateStore";
 import { appAtomRegistry } from "~/rpc/atomRegistry";
 import { primaryEnvironmentIdAtom } from "~/state/primaryEnvironment";
@@ -12,6 +13,7 @@ import {
 
 export function previewRuntimeFor(environmentId: EnvironmentId): PreviewRuntime | undefined {
   if (!readEnvironmentSupportsServerBrowser(environmentId)) return undefined;
+  if (readPreparedConnection(environmentId)?.nativeTransport === "iroh") return "server";
   if (
     isPreviewSupportedInRuntime() &&
     environmentId !== appAtomRegistry.get(primaryEnvironmentIdAtom)
@@ -27,6 +29,7 @@ export function alternatePreviewRuntime(
   serverBrowser: boolean,
   snapshot: Pick<PreviewSessionSnapshot, "runtime"> | null | undefined,
 ): PreviewRuntime | null {
+  if (readPreparedConnection(environmentId)?.nativeTransport === "iroh") return null;
   if (!snapshot || !serverBrowser || !isPreviewSupportedInRuntime()) return null;
   if (environmentId === primaryEnvironmentId) return null;
   return snapshot.runtime === "server" ? "desktop" : "server";
@@ -48,6 +51,7 @@ export function rendersServerTabNatively(
 ): boolean {
   return (
     isElectron &&
+    readPreparedConnection(environmentId)?.nativeTransport !== "iroh" &&
     snapshot?.runtime === "server" &&
     primaryEnvironmentId !== null &&
     environmentId === primaryEnvironmentId

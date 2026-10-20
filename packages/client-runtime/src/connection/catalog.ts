@@ -1,4 +1,4 @@
-import { DesktopSshEnvironmentTargetSchema, EnvironmentId } from "@t3tools/contracts";
+import { DesktopSshEnvironmentTargetSchema, EnvironmentId, IrohRoute } from "@t3tools/contracts";
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
 
@@ -20,6 +20,7 @@ export class BearerConnectionProfile extends Schema.TaggedClass<BearerConnection
   "BearerConnectionProfile",
   {
     ...ConnectionProfileBase,
+    iroh: Schema.optionalKey(IrohRoute),
     httpBaseUrl: Schema.String,
     wsBaseUrl: Schema.String,
     learned: Schema.optionalKey(Schema.Literal(true)),
@@ -113,14 +114,23 @@ export type ConnectionRegistration = typeof ConnectionRegistration.Type;
  * separate loopback origin and authenticate with a bearer token minted from
  * their bootstrap credential (`BearerConnectionRegistration`).
  */
+export class IrohConnectionRegistration extends Schema.TaggedClass<IrohConnectionRegistration>()(
+  "IrohConnectionRegistration",
+  {
+    target: BearerConnectionTarget,
+    profile: BearerConnectionProfile,
+  },
+) {}
+
 export const PlatformConnectionRegistration = Schema.Union([
+  IrohConnectionRegistration,
   PrimaryConnectionRegistration,
   BearerConnectionRegistration,
 ]);
 export type PlatformConnectionRegistration = typeof PlatformConnectionRegistration.Type;
 
 export function connectionRegistrationCatalogEntry(
-  registration: ConnectionRegistration | PrimaryConnectionRegistration,
+  registration: ConnectionRegistration | PrimaryConnectionRegistration | IrohConnectionRegistration,
 ): ConnectionCatalogEntry {
   switch (registration._tag) {
     case "PrimaryConnectionRegistration":
@@ -130,6 +140,7 @@ export function connectionRegistrationCatalogEntry(
         profile: Option.none(),
         enabled: true,
       };
+    case "IrohConnectionRegistration":
     case "BearerConnectionRegistration":
     case "SshConnectionRegistration":
       return {

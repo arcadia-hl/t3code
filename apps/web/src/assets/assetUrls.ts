@@ -35,6 +35,7 @@ export function useAssetUrlState(
     ...assetUrlStateFromResult(
       result,
       preparedConnection._tag === "Some" ? preparedConnection.value.httpBaseUrl : null,
+      preparedConnection._tag === "Some" ? preparedConnection.value : undefined,
     ),
     ...(result.waiting ? { waiting: true } : {}),
   };
@@ -54,7 +55,11 @@ export function useAssetUrlRefresh(
     if (environmentId === null || resource === null || httpBaseUrl === null) return null;
     const result = await refresh({ environmentId, input: { resource } });
     if (result._tag === "Failure") throw squashAtomCommandFailure(result);
-    return resolveAssetUrl(httpBaseUrl, result.value.relativeUrl);
+    return resolveAssetUrl(
+      httpBaseUrl,
+      result.value.relativeUrl,
+      connection._tag === "Some" ? connection.value : undefined,
+    );
   };
 }
 
@@ -85,7 +90,11 @@ export function useAssetUrls(
     resultIndex += 1;
     urls.push(
       result && AsyncResult.isSuccess(result)
-        ? resolveAssetUrl(preparedConnection.value.httpBaseUrl, result.value.relativeUrl)
+        ? resolveAssetUrl(
+            preparedConnection.value.httpBaseUrl,
+            result.value.relativeUrl,
+            preparedConnection.value,
+          )
         : null,
     );
   }

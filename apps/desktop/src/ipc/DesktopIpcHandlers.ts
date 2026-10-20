@@ -1,4 +1,5 @@
 import * as Effect from "effect/Effect";
+import * as Iroh from "./methods/iroh.ts";
 
 import { receiveProviderAuthCallback, cancelProviderAuthCallback } from "./methods/providerAuth.ts";
 import * as DesktopIpc from "./DesktopIpc.ts";
@@ -84,6 +85,9 @@ import {
 
 export const installDesktopIpcHandlers = Effect.fn("desktop.ipc.installHandlers")(function* () {
   const ipc = yield* DesktopIpc.DesktopIpc;
+  yield* ipc.handle(Iroh.devices);
+  yield* ipc.handle(Iroh.open);
+  yield* ipc.handle(Iroh.close);
   yield* installNotificationBadge();
   yield* PreviewIpc.installPreviewEventForwarding();
 

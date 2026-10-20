@@ -377,3 +377,28 @@ describe("browser target resolver", () => {
     expect(publicHosts.filter((host) => !isPublicFaviconHost(host))).toEqual([]);
   });
 });
+
+describe("Iroh preview safety", () => {
+  it("never turns the API gateway loopback into a client dev-server address", async () => {
+    readPreparedConnection.mockReturnValue({
+      httpBaseUrl: "http://127.0.0.1:43210",
+      nativeTransport: "iroh",
+    });
+    const resolver = await import("./browserTargetResolver");
+    expect(() =>
+      resolver.resolveBrowserNavigationTarget(EnvironmentId.make("iroh"), {
+        kind: "environment-port",
+        port: 5173,
+      }),
+    ).toThrow(/server-rendered/);
+    expect(() =>
+      resolver.resolveDiscoveredServerUrl(EnvironmentId.make("iroh"), "http://localhost:5173"),
+    ).toThrow(/server-rendered/);
+    expect(() =>
+      resolver.resolveBrowserNavigationTarget(EnvironmentId.make("iroh"), {
+        kind: "url",
+        url: "http://localhost:5173",
+      }),
+    ).toThrow(/server-rendered/);
+  });
+});

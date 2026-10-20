@@ -20,6 +20,8 @@ import * as Schema from "effect/Schema";
 import { AsyncResult, Atom, AtomRegistry } from "effect/reactivity";
 
 import * as EnvironmentRegistry from "../connection/registry.ts";
+import { gatewayCapabilityUrl } from "../connection/nativeGateway.ts";
+import type { PreparedConnection } from "../connection/model.ts";
 import * as EnvironmentSupervisor from "../connection/supervisor.ts";
 import { request } from "../rpc/client.ts";
 import type { ProjectFaviconCache, ProjectFaviconTarget } from "../projectFaviconCache.ts";
@@ -55,9 +57,15 @@ export function parseAssetCollectionKey(
   }
 }
 
-export function resolveAssetUrl(httpBaseUrl: string, relativeUrl: string): string | null {
+export function resolveAssetUrl(
+  httpBaseUrl: string,
+  relativeUrl: string,
+  prepared?: Pick<PreparedConnection, "httpBaseUrl"> & Partial<PreparedConnection>,
+): string | null {
   try {
-    return new URL(relativeUrl, httpBaseUrl).toString();
+    return prepared
+      ? gatewayCapabilityUrl(prepared, relativeUrl)
+      : new URL(relativeUrl, httpBaseUrl).toString();
   } catch {
     return null;
   }
@@ -110,10 +118,11 @@ export function blockedAssetUrlState(
 export function assetUrlStateFromResult(
   result: AsyncResult.AsyncResult<AssetCreateUrlResult, unknown>,
   httpBaseUrl: string | null,
+  prepared?: Pick<PreparedConnection, "httpBaseUrl"> & Partial<PreparedConnection>,
 ): AssetUrlState {
   if (result._tag === "Failure") return { _tag: "Failure" };
   if (httpBaseUrl === null || result._tag !== "Success") return { _tag: "Loading" };
-  const url = resolveAssetUrl(httpBaseUrl, result.value.relativeUrl);
+  const url = resolveAssetUrl(httpBaseUrl, result.value.relativeUrl, prepared);
   if (url === null) return { _tag: "Failure" };
   return {
     _tag: "Success",
@@ -205,7 +214,9 @@ export function createProjectFaviconUrlAtomFamily(input: {
   }) => Atom.Atom<AsyncResult.AsyncResult<AssetCreateUrlResult, unknown>>;
   readonly preparedConnection: (
     environmentId: EnvironmentId,
-  ) => Atom.Atom<Option.Option<{ readonly httpBaseUrl: string }>>;
+  ) => Atom.Atom<
+    Option.Option<Pick<PreparedConnection, "httpBaseUrl"> & Partial<PreparedConnection>>
+  >;
   readonly projectClones?: (
     environmentId: EnvironmentId,
   ) => Atom.Atom<ReadonlyArray<ProjectCloneSnapshot>>;
@@ -238,6 +249,7 @@ export function createProjectFaviconUrlAtomFamily(input: {
       const state = assetUrlStateFromResult(
         result,
         Option.isSome(connection) ? connection.value.httpBaseUrl : null,
+        Option.isSome(connection) ? connection.value : undefined,
       );
       return state._tag === "Success" ? state.url : Option.getOrNull(get.self<string | null>());
     }).pipe(Atom.setIdleTTL(ASSET_URL_IDLE_TTL_MS));

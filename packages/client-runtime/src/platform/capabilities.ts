@@ -82,3 +82,23 @@ export class SshEnvironmentGateway extends Context.Service<
     ) => Effect.Effect<void, ConnectionAttemptError>;
   }
 >()("@t3tools/client-runtime/platform/capabilities/SshEnvironmentGateway") {}
+
+/** Native ownership is per supervisor attempt; mobile and browser runtimes may omit this service. */
+export class IrohEnvironmentGateway extends Context.Service<
+  IrohEnvironmentGateway,
+  {
+    readonly prepare: (input: {
+      readonly profileId: string;
+      readonly hostId: string;
+      readonly environmentId: EnvironmentId;
+    }) => Effect.Effect<
+      {
+        readonly httpBaseUrl: string;
+        readonly socketUrl: string;
+        readonly gatewayToken: string;
+      },
+      ConnectionAttemptError,
+      import("effect/Scope").Scope
+    >;
+  }
+>()("@t3tools/client-runtime/platform/capabilities/IrohEnvironmentGateway") {}

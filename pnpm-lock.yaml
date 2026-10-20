@@ -214,6 +214,9 @@ importers:
 
   apps/desktop:
     dependencies:
+      '@t3tools/iroh':
+        specifier: workspace:*
+        version: link:../../packages/iroh
       '@clerk/electron':
         specifier: 0.1.1
         version: 0.1.1(@clerk/electron-passkeys@0.0.3)(electron-store@8.2.0)(electron@44.4.5)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
@@ -649,6 +652,9 @@ importers:
 
   apps/server:
     dependencies:
+      '@t3tools/iroh':
+        specifier: workspace:*
+        version: link:../../packages/iroh
       '@anthropic-ai/claude-agent-sdk':
         specifier: ^0.3.276
         version: 0.3.276(@anthropic-ai/sdk@0.93.0(zod@4.6.5))(@modelcontextprotocol/sdk@1.29.0(zod@4.6.5))(zod@4.6.5)
@@ -1539,6 +1545,12 @@ importers:
       vite-plus:
         specifier: 1.0.0
         version: 1.0.0(@types/node@24.12.4)(@vitest/browser-playwright@5.0.1)(@vitest/ui@5.0.1(vitest@5.0.1))(bufferutil@4.1.0)(esbuild@0.28.2)(jiti@2.7.0)(jsdom@30.1.0(@noble/hashes@1.8.0))(msw@2.12.11(@types/node@24.12.4)(typescript@7.0.2))(terser@5.48.0)(typescript@7.0.2)(unrun@0.2.39)(utf-8-validate@6.0.6)(yaml@2.9.0)
+
+  packages/iroh:
+    devDependencies:
+      '@types/node':
+        specifier: 24.12.4
+        version: 24.12.4
 
   packages/shared:
     dependencies:

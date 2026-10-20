@@ -36,6 +36,7 @@ import {
   selectCliRuntimeExternalDependencies,
 } from "./lib/cli-external-packages.ts";
 import { loadRepoEnv } from "./lib/public-config.ts";
+import { stageIrohRuntime } from "./lib/iroh-runtime.ts";
 import { selectDesktopRuntimeExternalDependencies } from "./lib/desktop-external-packages.ts";
 import { resolveCatalogDependencies } from "./lib/resolve-catalog.ts";
 
@@ -56,7 +57,7 @@ import { Command, Flag } from "effect/cli";
 import { ChildProcess, ChildProcessSpawner } from "effect/process";
 
 const LINUX_ICON_SIZES = [16, 22, 24, 32, 48, 64, 128, 256, 512] as const;
-const DESKTOP_APP_ID = "com.t3tools.t3code";
+const DESKTOP_APP_ID = "com.t3tools.t3code.iroh";
 const APPLE_TEAM_ID_PATTERN = /^[A-Z0-9]{10}$/u;
 
 const BuildPlatform = Schema.Literals(["mac", "linux", "win"]);
@@ -2669,10 +2670,8 @@ export function resolvePackageManagerUserAgent(packageManager: string): string {
   return `${trimmed.slice(0, versionSeparator)}/${trimmed.slice(versionSeparator + 1)}`;
 }
 
-export function resolveDesktopProductName(version: string): string {
-  return resolveDesktopUpdateChannel(version) === "nightly"
-    ? "T3 Code (Nightly)"
-    : (desktopPackageJson.productName ?? "T3 Code");
+export function resolveDesktopProductName(_version: string): string {
+  return "T3 Code Iroh (Experimental)";
 }
 
 export const createBuildConfig = Effect.fn("createBuildConfig")(function* (
@@ -2694,7 +2693,7 @@ export const createBuildConfig = Effect.fn("createBuildConfig")(function* (
   const buildConfig: Record<string, unknown> = {
     appId: DESKTOP_APP_ID,
     productName: resolveDesktopProductName(version),
-    artifactName: "T3-Code-${version}-${arch}.${ext}",
+    artifactName: "T3-Code-Iroh-${version}-${arch}.${ext}",
     electronLanguages: [...DESKTOP_ELECTRON_LANGUAGES],
     files: [
       ...DESKTOP_FILE_EXCLUSIONS,
@@ -2726,19 +2725,6 @@ export const createBuildConfig = Effect.fn("createBuildConfig")(function* (
   // GH_TOKEN/GITHUB_TOKEN. The staged app has no repository to resolve it
   // against, so writing update manifests then crashes on a null config.
   buildConfig.publish = null;
-  if (!isDesktopPreviewVersion(version)) {
-    const publishConfig = yield* resolveGitHubPublishConfig(updateChannel);
-    if (publishConfig) {
-      buildConfig.publish = [publishConfig];
-    } else if (mockUpdates) {
-      buildConfig.publish = [
-        {
-          provider: "generic",
-          url: resolveMockUpdateServerUrl(mockUpdateServerPort),
-        },
-      ];
-    }
-  }
 
   if (platform === "mac") {
     const path = yield* Path.Path;
@@ -2768,7 +2754,7 @@ export const createBuildConfig = Effect.fn("createBuildConfig")(function* (
       protocols: [
         {
           name: "T3 Code",
-          schemes: ["t3code", "t3code-dev"],
+          schemes: ["t3code-iroh", "t3code-iroh-dev"],
         },
         {
           name: "Web site URL",
@@ -2816,8 +2802,8 @@ export const createBuildConfig = Effect.fn("createBuildConfig")(function* (
     const path = yield* Path.Path;
     const repoRoot = yield* RepoRoot;
     buildConfig.linux = {
-      target: target === "AppImage" ? [target, "deb"] : [target],
-      executableName: "t3code",
+      target: [target],
+      executableName: "t3code-iroh",
       icon: "icons",
       category: "Development",
       synopsis: "Desktop GUI for coding agents",
@@ -2825,12 +2811,12 @@ export const createBuildConfig = Effect.fn("createBuildConfig")(function* (
       protocols: [
         {
           name: "T3 Code",
-          schemes: ["t3code", "t3code-dev"],
+          schemes: ["t3code-iroh", "t3code-iroh-dev"],
         },
       ],
       desktop: {
         entry: {
-          StartupWMClass: "t3code",
+          StartupWMClass: "t3code-iroh",
         },
       },
     };
@@ -3732,6 +3718,17 @@ const buildDesktopArtifact = Effect.fn("buildDesktopArtifact")(function* (
           arch: options.arch,
           fffNodeVersion: serverPackageJson.dependencies["@ff-labs/fff-node"],
         });
+  Object.assign(
+    stageDependencies,
+    yield* Effect.promise(() =>
+      stageIrohRuntime({
+        source: path.join(repoRoot, "packages/iroh/binding"),
+        stage: stageAppDir,
+        platform: options.platform,
+        arch: options.arch,
+      }),
+    ),
+  );
   const stagePatchedDependencies = createStagePatchedDependencies(
     workspacePatchedDependencies,
     stageDependencies,

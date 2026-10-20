@@ -8,6 +8,7 @@ import * as Effect from "effect/Effect";
 import type { HttpClient } from "effect/http";
 
 import * as RemoteEnvironmentAuthorization from "../authorization/service.ts";
+import { nativeGatewayToken } from "../connection/nativeGateway.ts";
 import type { PreparedConnection } from "../connection/model.ts";
 import { environmentEndpointUrl } from "../environment/endpoint.ts";
 import * as ManagedRelay from "../relay/managedRelay.ts";
@@ -46,7 +47,12 @@ export const resolveDeviceHubAccess = Effect.fn("clientRuntime.state.resolveDevi
     return {
       httpBase,
       wsBase,
-      query: { wsTicket: ticket.ticket },
+      query: {
+        wsTicket: ticket.ticket,
+        ...(nativeGatewayToken(input.prepared) === undefined
+          ? {}
+          : { gatewayToken: nativeGatewayToken(input.prepared)! }),
+      },
       credentials: false,
     };
   },

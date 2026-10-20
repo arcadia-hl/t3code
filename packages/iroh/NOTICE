@@ -1,0 +1,12 @@
+T3 Code Iroh native transport
+
+The generated declaration file src/upstream.d.ts is from n0-computer/iroh-ffi,
+commit 3103bf5295be6d50c5272ff7a426e9b539f3f587, licensed MIT OR Apache-2.0.
+The corresponding licenses are preserved in licenses/. The build script copies
+these notices beside the locally built native addon. Native binaries are not
+checked in. See build.mjs for the exact source and locked build command.
+
+Local declaration changes expose clearIpTransports and correct EndpointId
+comments to the hexadecimal representation verified against the pinned runtime.
+The local Rust patch also makes receive stop and send reset interrupt pending
+operations before taking the stream mutex, and exposes relay-only transport.

@@ -29,6 +29,7 @@ import {
   resolveFffNativeDependencies,
   STAGE_INSTALL_ARGS,
 } from "./build-desktop-artifact.ts";
+import { stageIrohRuntime } from "./lib/iroh-runtime.ts";
 import { selectCliRuntimeExternalDependencies } from "./lib/cli-external-packages.ts";
 import { resolveCatalogDependencies } from "./lib/resolve-catalog.ts";
 
@@ -156,9 +157,18 @@ const stageRuntimeExternals = Effect.fn("stageRuntimeExternals")(function* (inpu
       hint: "The archive stages fff's platform binary from this version.",
     });
   }
+  const irohDependencies = yield* Effect.promise(() =>
+    stageIrohRuntime({
+      source: path.join(input.repoRoot, "packages/iroh/binding"),
+      stage: input.stageDir,
+      platform: input.platform,
+      arch: input.arch,
+    }),
+  );
   const dependencies = {
     ...selectCliRuntimeExternalDependencies(serverDependencies),
     ...resolveFffNativeDependencies(input.platform, input.arch, fffNodeVersion),
+    ...irohDependencies,
   };
   const patchedDependencies = createStagePatchedDependencies(
     workspace.patchedDependencies ?? {},

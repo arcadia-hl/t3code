@@ -32,6 +32,10 @@ const resolveEnvironmentPortTarget = (
   requestedUrl?: string,
   sourceUrl?: URL,
 ): PreviewUrlResolution => {
+  if (readPreparedConnection(environmentId)?.nativeTransport === "iroh")
+    throw new Error(
+      "Iroh remote previews require the server-rendered browser; API gateways do not forward development-server ports.",
+    );
   if (!isPrivateNetworkHost(environmentUrl.hostname)) {
     throw new Error(
       "This environment port needs the planned authenticated preview gateway; its server address is not directly private-network reachable.",
@@ -69,6 +73,11 @@ export function resolveBrowserNavigationTarget(
   target: BrowserNavigationTarget,
 ): PreviewUrlResolution {
   if (target.kind === "url") {
+    if (
+      readPreparedConnection(environmentId)?.nativeTransport === "iroh" &&
+      isLoopbackHost(new URL(target.url).hostname)
+    )
+      throw new Error("Iroh remote previews require the server-rendered browser.");
     return {
       requestedUrl: target.url,
       resolvedUrl: target.url,
@@ -90,6 +99,8 @@ const reachesEnvironmentLoopback = (target: ConnectionTarget): boolean =>
   (target._tag === "PrimaryConnectionTarget" || isDesktopLocalConnectionTarget(target));
 
 export function resolveDiscoveredServerUrl(environmentId: EnvironmentId, rawUrl: string): string {
+  if (readPreparedConnection(environmentId)?.nativeTransport === "iroh")
+    throw new Error("Iroh remote previews require the server-rendered browser.");
   try {
     const normalizedUrl = normalizePreviewUrl(rawUrl);
     const parsed = new URL(normalizedUrl);

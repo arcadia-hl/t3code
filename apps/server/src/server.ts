@@ -141,6 +141,7 @@ import {
   RELAY_URL_SECRET,
 } from "./cloud/config.ts";
 import * as EnvironmentAuth from "./auth/EnvironmentAuth.ts";
+import * as IrohRuntime from "./iroh/runtime.ts";
 import * as CloudHttp from "./cloud/http.ts";
 import * as CloudLink from "./cloud/CloudLink.ts";
 import { pendingServiceUpdateExists } from "./cloud/updateHandoff.ts";
@@ -1054,6 +1055,7 @@ const layerMakeServer = Layer.unwrap(
       layerTailscaleServe,
       layerCloudDesiredLinkReconcile,
       HeapSnapshot.layer,
+      IrohRuntime.layer,
     );
 
     return layerServerApplication.pipe(

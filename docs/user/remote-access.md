@@ -30,6 +30,71 @@ connection. Pull request diffs and provider settings keep working after the
 previous credential expires. A failed renewal affects that request; it does not
 disconnect an otherwise healthy conversation.
 
+## Linux Iroh (experimental source builds)
+
+Iroh provides an accountless route between a Linux host and the native Linux
+desktop app. It requires the patched native binding built from this checkout;
+mobile, macOS, Windows, and browser clients cannot use this route yet. Existing
+local, SSH, private-network, and T3 Connect routes remain available.
+
+Use a separate private T3 base directory. Its ancestors must reject group and
+other writes (a shared sticky directory is allowed); the base and `userdata`
+directories must be owner-only. With that directory already prepared:
+
+```bash
+t3 iroh enable --state-dir <private-base>/userdata
+t3 start --base-dir <private-base> --host 127.0.0.1 --no-browser
+```
+
+In another host terminal, create an invitation:
+
+```bash
+t3 iroh invite --state-dir <private-base>/userdata
+```
+
+The link expires after five minutes and can enroll one device. Treat it as a
+secret and share it privately. On the client, run the following command and
+paste the link into stdin, followed by Enter:
+
+```bash
+t3 iroh pair --profiles-dir <desktop-base>/userdata/iroh-client
+```
+
+The command prints a device ID. Verify that ID with the person enrolling, then
+approve it locally on the host:
+
+```bash
+t3 iroh devices --state-dir <private-base>/userdata
+t3 iroh approve <device-id> --state-dir <private-base>/userdata
+```
+
+The Linux desktop reads profiles from its own T3 base directory, including when
+its local environment is disabled. Enrollment defaults to read-only. To allow
+command execution as the host user, add `--control` to **all three** invitation,
+pairing, and approval commands. This first cut requires matching requested and
+approved scopes; a narrower approval fails renewal instead of widening access.
+
+Remove a device with `t3 iroh revoke-device <device-id> --state-dir
+<private-base>/userdata`. This invalidates its sessions and closes its Iroh
+connections. Revoking an invitation with `revoke-invitation <invitation-id>`
+only prevents unused enrollment. `forget <profile-id> --profiles-dir <path>`
+removes a client profile; it does not revoke its host grant. Already issued
+signed asset URLs can remain valid for up to one hour through another reachable
+route.
+
+Free public Iroh relays and discovery are the default. An owner-only JSON file
+supplied through `--relay-config <path>` on `enable` and `pair` can select
+`{"mode":"private-only","relays":[{"url":"https://relay.example/"}]}`.
+Private-only mode disables public discovery and relay fallback. Optional
+`authToken` fields belong in that private file, never in a URL or command line.
+Disable the host route with `iroh disable --state-dir <path>` and restart it;
+keys and device grants are retained.
+
+Remote development previews require the host's server-rendered browser. This
+first cut does not forward development-server ports, discover cloud accounts,
+deliver push notifications, or provide offline access. A running reachable host
+remains necessary.
+
 ## Pair over a LAN or private network
 
 Use direct pairing when the other device can reach the host's network address.

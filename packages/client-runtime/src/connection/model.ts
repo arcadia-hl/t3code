@@ -124,6 +124,7 @@ export interface PreparedConnection {
   readonly label: string;
   readonly httpBaseUrl: string;
   readonly socketUrl: string;
+  readonly nativeTransport?: "iroh";
   readonly httpAuthorization: PreparedHttpAuthorization | null;
   readonly target: ConnectionTarget;
 }

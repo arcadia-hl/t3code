@@ -41,7 +41,7 @@ interface ElectronAppCalls {
 const layerElectronApp = (calls: ElectronAppCalls) =>
   Layer.succeed(ElectronApp.ElectronApp, {
     metadata: Effect.die("unexpected metadata read"),
-    name: Effect.succeed("T3 Code"),
+    name: Effect.succeed("T3 Code Iroh"),
     systemLocale: Effect.succeed("en-US"),
     whenReady: Effect.void,
     requestSingleInstanceLock: Effect.succeed(true),
@@ -133,7 +133,7 @@ const withIdentity = <A, E, R>(
               input.legacyPathProbeError
                 ? Effect.fail(input.legacyPathProbeError)
                 : Effect.succeed(
-                    input.legacyPathExists === true && /T3 Code \((Alpha|Dev)\)/.test(path),
+                    input.legacyPathExists === true && /T3 Code Iroh \((Alpha|Dev)\)/.test(path),
                   ),
             readFileString: () =>
               Effect.succeed(input.packageJson ?? '{"t3codeCommitHash":"abcdef1234567890"}'),
@@ -154,7 +154,7 @@ describe("DesktopAppIdentity", () => {
         const identity = yield* DesktopAppIdentity.DesktopAppIdentity;
         const userDataPath = yield* identity.resolveUserDataPath;
 
-        assert.equal(userDataPath, "/Users/alice/Library/Application Support/t3code-v2");
+        assert.equal(userDataPath, "/Users/alice/Library/Application Support/t3code-iroh-v1");
       }),
       { legacyPathExists: true },
     ),
@@ -166,7 +166,7 @@ describe("DesktopAppIdentity", () => {
         const identity = yield* DesktopAppIdentity.DesktopAppIdentity;
         assert.equal(
           yield* identity.resolveUserDataPath,
-          "/Users/alice/Library/Application Support/T3 Code (Dev)",
+          "/Users/alice/Library/Application Support/T3 Code Iroh (Dev)",
         );
       }),
       {
@@ -177,7 +177,7 @@ describe("DesktopAppIdentity", () => {
   );
 
   it.effect("preserves failures while inspecting the legacy userData path", () => {
-    const legacyPath = "/Users/alice/Library/Application Support/T3 Code (Dev)";
+    const legacyPath = "/Users/alice/Library/Application Support/T3 Code Iroh (Dev)";
     const cause = PlatformError.systemError({
       _tag: "PermissionDenied",
       module: "FileSystem",
@@ -218,8 +218,8 @@ describe("DesktopAppIdentity", () => {
         const identity = yield* DesktopAppIdentity.DesktopAppIdentity;
         yield* identity.configure;
 
-        assert.deepEqual(calls.setName, ["T3 Code Beta"]);
-        assert.equal(calls.setAboutPanelOptions[0]?.applicationName, "T3 Code (Beta)");
+        assert.deepEqual(calls.setName, ["T3 Code Iroh Beta"]);
+        assert.equal(calls.setAboutPanelOptions[0]?.applicationName, "T3 Code Iroh (Beta)");
         assert.equal(calls.setAboutPanelOptions[0]?.applicationVersion, "1.2.3");
         assert.equal(calls.setAboutPanelOptions[0]?.version, "0123456789ab");
         assert.deepEqual(calls.setDockIcon, []);
@@ -260,9 +260,9 @@ describe("DesktopAppIdentity", () => {
 
         const runtimeName = calls.setName[0];
         assert.isDefined(runtimeName);
-        assert.equal(runtimeName, `T3 Code ${stage}`);
+        assert.equal(runtimeName, `T3 Code Iroh ${stage}`);
         assert.match(runtimeName.replaceAll(" ", ""), /^[!#$%&'*+\-.^_`|~0-9A-Za-z]+$/);
-        assert.equal(calls.setAboutPanelOptions[0]?.applicationName, `T3 Code (${stage})`);
+        assert.equal(calls.setAboutPanelOptions[0]?.applicationName, `T3 Code Iroh (${stage})`);
       }),
       { calls, environment },
     );
