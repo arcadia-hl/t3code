@@ -57,6 +57,28 @@ export function assertSameInventory(expected, actual) {
   NodeAssert.deepEqual(actual, expected, "Portable payload differs from the verified installer.");
 }
 
+export function findPayloadRoot(root) {
+  const matches = [];
+  const visit = (directory) => {
+    if (
+      NodeFS.existsSync(NodePath.join(directory, "T3 Code Iroh (Experimental).exe")) &&
+      NodeFS.existsSync(NodePath.join(directory, "resources", "app.asar"))
+    ) {
+      matches.push(directory);
+      return;
+    }
+    for (const name of NodeFS.readdirSync(directory)) {
+      const path = NodePath.join(directory, name),
+        stat = NodeFS.lstatSync(path);
+      NodeAssert.equal(stat.isSymbolicLink(), false);
+      if (stat.isDirectory()) visit(path);
+    }
+  };
+  visit(root);
+  if (matches.length > 1) throw new Error("Ambiguous extracted application roots.");
+  return matches[0];
+}
+
 export function inventoryHash(files) {
   return NodeCrypto.createHash("sha256").update(JSON.stringify(files)).digest("hex");
 }

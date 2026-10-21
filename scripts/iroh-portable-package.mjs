@@ -14,6 +14,7 @@ import {
   inventory,
   inventoryHash,
   assertSameInventory,
+  findPayloadRoot,
   superviseProbe,
 } from "./iroh-portable.mjs";
 
@@ -61,8 +62,12 @@ function extract(exe, label) {
   const wrapper = NodePath.join(workspace, label + "-wrapper"),
     payload = NodePath.join(workspace, label + "-payload");
   run(sevenzip, ["x", "-y", "-o" + wrapper, exe]);
+  const direct = findPayloadRoot(wrapper);
+  if (direct !== undefined) return direct;
   run(sevenzip, ["x", "-y", "-o" + payload, embeddedArchive(wrapper)]);
-  return payload;
+  const extracted = findPayloadRoot(payload);
+  NodeAssert.ok(extracted, "Embedded archive did not contain the application.");
+  return extracted;
 }
 function unsignedPE(file, expectedMachine) {
   const bytes = Buffer.alloc(4096),
@@ -124,7 +129,8 @@ const config = {
     // In builder26.15.6 true omits UNPACK_DIR_NAME, selecting per-launch $PLUGINSDIR.
     unpackDirName: true,
     requestExecutionLevel: "user",
-    packElevateHelper: false,
+    // Direct-file mode bypasses the archive helper that copies elevate.exe.
+    useZip: true,
   },
 };
 const configPath = NodePath.join(workspace, "portable-config.json");

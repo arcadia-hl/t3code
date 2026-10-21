@@ -3,7 +3,12 @@ import * as NodeAssert from "node:assert/strict";
 import * as NodeFS from "node:fs";
 import * as NodePath from "node:path";
 import * as NodeOS from "node:os";
-import { inventory, assertSameInventory, superviseProbe } from "./iroh-portable.mjs";
+import {
+  inventory,
+  assertSameInventory,
+  superviseProbe,
+  findPayloadRoot,
+} from "./iroh-portable.mjs";
 
 async function fixture(run) {
   const root = NodeFS.mkdtempSync(NodePath.join(NodeOS.tmpdir(), "iroh-portable-test-"));
@@ -13,6 +18,30 @@ async function fixture(run) {
     NodeFS.rmSync(root, { recursive: true, force: true });
   }
 }
+
+NodeTest.test("finds the app in direct or nested 7zip output", async () => {
+  await fixture(async (root) => {
+    NodeAssert.equal(findPayloadRoot(root), undefined);
+    const app = NodePath.join(root, "nested", "app");
+    NodeFS.mkdirSync(NodePath.join(app, "resources"), { recursive: true });
+    NodeFS.writeFileSync(NodePath.join(app, "resources", "app.asar"), "archive");
+    NodeFS.writeFileSync(NodePath.join(app, "T3 Code Iroh (Experimental).exe"), "app");
+    NodeAssert.equal(findPayloadRoot(root), app);
+    NodeAssert.equal(findPayloadRoot(app), app);
+  });
+});
+
+NodeTest.test("ambiguous extracted application roots are rejected", async () => {
+  await fixture(async (root) => {
+    for (const name of ["first", "second"]) {
+      const app = NodePath.join(root, name);
+      NodeFS.mkdirSync(NodePath.join(app, "resources"), { recursive: true });
+      NodeFS.writeFileSync(NodePath.join(app, "resources", "app.asar"), "archive");
+      NodeFS.writeFileSync(NodePath.join(app, "T3 Code Iroh (Experimental).exe"), "app");
+    }
+    NodeAssert.throws(() => findPayloadRoot(root), /Ambiguous/);
+  });
+});
 
 NodeTest.test("payload comparison rejects changed, missing and additional files", async () => {
   await fixture(async (root) => {
