@@ -8,9 +8,21 @@ import * as NodeChildProcess from "node:child_process";
 import * as NodeOS from "node:os";
 import { assert, it, vi } from "vite-plus/test";
 
-import { fixPath, hydratePosixHome } from "./os-jank.ts";
+import { fixPath, hydratePosixHome, resolveBaseDir } from "./os-jank.ts";
 
 vi.mock("node:child_process", { spy: true });
+
+effectIt.effect.each([undefined, "", "   "])(
+  "isolates the fork's default data home for %s",
+  (raw) =>
+    Effect.gen(function* () {
+      const resolved = yield* resolveBaseDir(raw).pipe(
+        Effect.provideService(HostProcess.HomeDirectory, "/home/headless-test"),
+        Effect.provide(NodeServices.layer),
+      );
+      assert.equal(resolved, "/home/headless-test/.t3-iroh");
+    }),
+);
 
 it("hydrates HOME for minimal service environments from the user account", () => {
   const env: NodeJS.ProcessEnv = {};
