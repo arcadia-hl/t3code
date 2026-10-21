@@ -28,6 +28,9 @@ NodeAssert.equal(hashFile(installer), INSTALLER_SHA256, "Wrong source installer.
 const require = NodeModule.createRequire(NodePath.join(tools, "package.json"));
 NodeAssert.equal(require("electron-builder/package.json").version, "26.15.6");
 const sevenzip = await require("app-builder-lib/out/toolsets/7zip").getPath7za();
+// Builder's minimal 7za reads embedded 7z streams, but not direct-file NSIS containers.
+const extractor = NodePath.join(process.env.ProgramFiles, "7-Zip", "7z.exe");
+NodeAssert.ok(NodeFS.existsSync(extractor), "Native Windows verifier requires full 7-Zip.");
 const commands = NodePath.join(workspace, "commands.jsonl");
 function run(executable, args, cwd = workspace) {
   console.log(JSON.stringify({ command: executable, args }));
@@ -61,10 +64,10 @@ function embeddedArchive(root) {
 function extract(exe, label) {
   const wrapper = NodePath.join(workspace, label + "-wrapper"),
     payload = NodePath.join(workspace, label + "-payload");
-  run(sevenzip, ["x", "-y", "-o" + wrapper, exe]);
+  run(extractor, ["x", "-y", "-o" + wrapper, exe]);
   const direct = findPayloadRoot(wrapper);
   if (direct !== undefined) return direct;
-  run(sevenzip, ["x", "-y", "-o" + payload, embeddedArchive(wrapper)]);
+  run(extractor, ["x", "-y", "-o" + payload, embeddedArchive(wrapper)]);
   const extracted = findPayloadRoot(payload);
   NodeAssert.ok(extracted, "Embedded archive did not contain the application.");
   return extracted;
@@ -216,7 +219,20 @@ const manifest = {
     bytes: NodeFS.statSync(executable).size,
     sha256: hashFile(executable),
   },
-  tooling: { electronBuilder: "26.15.6", sevenzip: "checksum-pinned builder toolset7zip@1.0.0" },
+  tooling: {
+    electronBuilder: "26.15.6",
+    sevenzip: "checksum-pinned builder toolset7zip@1.0.0",
+    minimalSevenzipSha256: hashFile(sevenzip),
+    verifier: {
+      path: extractor,
+      sha256: hashFile(extractor),
+      dllSha256: hashFile(NodePath.join(NodePath.dirname(extractor), "7z.dll")),
+      version: NodeChildProcess.execFileSync(extractor, ["i"], { encoding: "utf8" })
+        .split("\n")
+        .slice(0, 4)
+        .join("\n"),
+    },
+  },
   verification: {
     physicalFiles: files.length,
     payloadInventorySha256: inventoryHash(files),
