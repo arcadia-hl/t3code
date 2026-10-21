@@ -15,6 +15,7 @@ import {
   inventoryHash,
   assertSameInventory,
   findPayloadRoot,
+  appFilesFromPortable,
   superviseProbe,
 } from "./iroh-portable.mjs";
 
@@ -155,17 +156,18 @@ run(process.execPath, [
 assertSameInventory(files, inventory(payload));
 const executable = NodePath.join(output, artifactName);
 const portablePayload = extract(executable, "portable");
-assertSameInventory(files, inventory(portablePayload));
+const portableFiles = inventory(portablePayload);
+assertSameInventory(files, appFilesFromPortable(portableFiles));
 const wrapperPE = unsignedPE(executable),
   appPE = unsignedPE(NodePath.join(portablePayload, "T3 Code Iroh (Experimental).exe"), 0x8664);
 const helper = NodeURL.fileURLToPath(new URL("./iroh-portable.mjs", import.meta.url));
 const code =
   "import(require('node:url').pathToFileURL(process.argv[1]).href).then(m=>m.portableProbeChild())";
 const probes = [];
-for (const mode of ["normal", "normal", "corrupt"]) {
-  const fixture = NodeFS.mkdtempSync(NodePath.join(workspace, "probe-")),
-    marker = NodePath.join(fixture, "success marker.json");
-  try {
+const fixture = NodeFS.mkdtempSync(NodePath.join(workspace, "probe-"));
+try {
+  for (const mode of ["normal", "normal", "corrupt"]) {
+    const marker = NodePath.join(fixture, "success marker " + probes.length + ".json");
     const result = await superviseProbe({
       executable,
       args: ["-e", code, helper, marker, baselinePath, mode],
@@ -186,9 +188,9 @@ for (const mode of ["normal", "normal", "corrupt"]) {
       );
     }
     probes.push({ mode, ...result });
-  } finally {
-    NodeFS.rmSync(fixture, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
   }
+} finally {
+  NodeFS.rmSync(fixture, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
 }
 NodeAssert.notEqual(
   NodePath.dirname(probes[0].marker.executable),
@@ -235,6 +237,7 @@ const manifest = {
   },
   verification: {
     physicalFiles: files.length,
+    wrapperComponents: portableFiles.filter((file) => file.path.startsWith("$PLUGINSDIR/")),
     payloadInventorySha256: inventoryHash(files),
     payloadByteEquality:
       "all55 files match installer before/after packaging, extracted archive and live launcher runtime",

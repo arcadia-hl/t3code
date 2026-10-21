@@ -8,7 +8,31 @@ import {
   assertSameInventory,
   superviseProbe,
   findPayloadRoot,
+  appFilesFromPortable,
 } from "./iroh-portable.mjs";
+
+NodeTest.test(
+  "NSIS wrapper helpers are verified separately from unchanged application files",
+  () => {
+    const app = { path: "resources/app.asar", bytes: 12, sha256: "app" };
+    const plugins = [
+      { path: "$PLUGINSDIR/first.dll", bytes: 1, sha256: "first" },
+      { path: "$PLUGINSDIR/second.dll", bytes: 2, sha256: "second" },
+    ];
+    NodeAssert.deepEqual(appFilesFromPortable([app, ...plugins], plugins), [app]);
+    NodeAssert.deepEqual(appFilesFromPortable([app], plugins), [app]);
+    NodeAssert.throws(() =>
+      appFilesFromPortable([app, { ...plugins[0], sha256: "tampered" }, plugins[1]], plugins),
+    );
+    NodeAssert.throws(() => appFilesFromPortable([app, plugins[0]], plugins));
+    NodeAssert.throws(() =>
+      appFilesFromPortable(
+        [app, ...plugins, { path: "$PLUGINSDIR/unknown.dll", bytes: 1, sha256: "unknown" }],
+        plugins,
+      ),
+    );
+  },
+);
 
 async function fixture(run) {
   const root = NodeFS.mkdtempSync(NodePath.join(NodeOS.tmpdir(), "iroh-portable-test-"));

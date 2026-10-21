@@ -57,6 +57,26 @@ export function assertSameInventory(expected, actual) {
   NodeAssert.deepEqual(actual, expected, "Portable payload differs from the verified installer.");
 }
 
+const WRAPPER_PLUGINS = [
+  {
+    path: "$PLUGINSDIR/StdUtils.dll",
+    bytes: 102400,
+    sha256: "b72e9013a6204e9f01076dc38dabbf30870d44dfc66962adbf73619d4331601e",
+  },
+  {
+    path: "$PLUGINSDIR/System.dll",
+    bytes: 12288,
+    sha256: "3eb38ae99653a7dbc724132ee240f6e5c4af4bfe7c01d31d23faf373f9f2eaca",
+  },
+];
+
+export function appFilesFromPortable(files, expectedPlugins = WRAPPER_PLUGINS) {
+  // Full 7-Zip flattens $INSTDIR beside the NSIS plugin namespace.
+  const plugins = files.filter((file) => file.path.startsWith("$PLUGINSDIR/"));
+  if (plugins.length !== 0) assertSameInventory(expectedPlugins, plugins);
+  return files.filter((file) => !file.path.startsWith("$PLUGINSDIR/"));
+}
+
 export function findPayloadRoot(root) {
   const matches = [];
   const visit = (directory) => {
