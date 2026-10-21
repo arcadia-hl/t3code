@@ -1,0 +1,56 @@
+name: Iroh Windows x64 portable repack
+on:
+  push:
+    branches: [build/iroh-windows-portable]
+permissions:
+  contents: read
+  actions: read
+jobs:
+  portable:
+    runs-on: windows-2022
+    timeout-minutes: 30
+    env:
+      CSC_IDENTITY_AUTO_DISCOVERY: "false"
+      RAYON_NUM_THREADS: "1"
+    steps:
+      - name: Fetch exact public packaging scripts
+        shell: pwsh
+        run: |
+          git init .
+          git remote add origin https://github.com/arcadia-hl/t3code.git
+          git config core.autocrlf false
+          git fetch --no-tags --depth=1 origin $env:GITHUB_SHA
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          @('/scripts/iroh-portable*', '/.github/workflows/iroh-windows-portable.yml') | git sparse-checkout set --no-cone --stdin
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          git -c submodule.recurse=false checkout --detach FETCH_HEAD
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          if ((git rev-parse HEAD) -ne $env:GITHUB_SHA) { throw 'Packaging source mismatch' }
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24.13.1
+      - name: Focused payload and launcher denial cases
+        run: node --test scripts/iroh-portable.test.mjs
+      - name: Retrieve only the tested source installer
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh run download 39518025945 --repo arcadia-hl/t3code --name t3-code-iroh-windows-x64-57ef1d5b16d48ae56b62eb36915beb037b101037 --dir work/source-installer
+      - name: Install pinned packaging tools only
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force work/tools | Out-Null
+          '{"private":true}' | Set-Content work/tools/package.json
+          npm install --prefix work/tools --ignore-scripts --no-audit --no-fund electron-builder@26.15.6
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+      - name: Repackage byte-identical app and exercise actual portable launcher
+        shell: pwsh
+        run: |
+          $env:ELECTRON_BUILDER_CACHE = Join-Path $env:RUNNER_TEMP 'iroh-portable-builder-cache'
+          node scripts/iroh-portable-package.mjs work/package work/source-installer/T3-Code-Iroh-0.1.0-preview.20261020.2-x64.exe work/tools
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: t3-code-iroh-windows-x64-portable-${{ github.sha }}
+          path: work/package/artifacts/
+          if-no-files-found: error
+          retention-days: 7
